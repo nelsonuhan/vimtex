@@ -40,6 +40,8 @@ endfunction
 function! vimtex#util#get_os() " {{{1
   if has('win32')
     return 'win'
+  elseif has('ios')
+    return ''
   elseif has('unix')
     if system('uname') =~# 'Darwin'
       return 'mac'
