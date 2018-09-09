@@ -47,7 +47,8 @@ CONTENTS                                                      *vimtex-contents*
   Completion                                    |vimtex-completion|
     Complete citations                          |vimtex-complete-cites|
     Complete labels                             |vimtex-complete-labels|
-    Complete commands                           |vimtex-complete-commands|
+    Complete commands and environments          |vimtex-complete-commands|
+                                                |vimtex-complete-environments|
     Complete image file names                   |vimtex-complete-images|
     Complete input file names                   |vimtex-complete-input|
     Complete PDF file names                     |vimtex-complete-pdf|
@@ -56,8 +57,9 @@ CONTENTS                                                      *vimtex-contents*
     Complete packages and documentclasses       |vimtex-complete-packages|
                                                 |vimtex-complete-classes|
     Autocomplete                                |vimtex-complete-auto|
-      Neocomplete                               |vimtex-complete-neocomplete|
       deoplete                                  |vimtex-complete-deoplete|
+      Neocomplete                               |vimtex-complete-neocomplete|
+      ncm2                                      |vimtex-complete-ncm2|
       nvim-completion-manager                   |vimtex-complete-ncm|
       YouCompleteMe                             |vimtex-complete-youcompleteme|
       VimCompletesMe                            |vimtex-complete-vcm|
@@ -65,10 +67,10 @@ CONTENTS                                                      *vimtex-contents*
   Indentation                                   |vimtex-indent|
   Syntax highlighting                           |vimtex-syntax|
   Navigation                                    |vimtex-navigation|
-    Table of contents                           |vimtex-toc|
-    Table of labels                             |vimtex-labels|
-    Unite sources                               |vimtex-unite|
     Include expression (|gf| command)             |vimtex-includeexpr|
+    Table of contents                           |vimtex-toc|
+      Custom mappings                           |vimtex-toc-custom-maps|
+    Denite/Unite source                         |vimtex-denite| / |vimtex-unite|
   Compilation                                   |vimtex-compiler|
     Latexmk                                     |vimtex-latexmk|
     Latexrun                                    |vimtex-latexrun|
@@ -116,12 +118,16 @@ Feature overview~
   - package and documentclass names based on available `.sty` and `.cls` files
 - Document navigation through
   - table of content
-  - table of labels
-  - enhanced `gf` command
+  - proper settings for |'include'|, |'includeexpr'|, |'suffixesadd'| and
+    |'define'|, which among other things
+    - allow |include-search| and |definition-search|
+    - give enhanced |gf| command
 - Easy access to (online) documentation of packages
 - Word count (through `texcount`)
 - Motions
-  - Move between sections with `[[`, `[]`, `][`, `]]`
+  - Move between section boundaries with `[[`, `[]`, `][`, and `]]`
+  - Move between environment boundaries with `[m`, `[M`, `]m`, and `]M`
+  - Move between comment boundaries with `[*` and `]*`
   - Move between matching delimiters with `%`
 - Text objects
   - `ic` `ac` Commands
@@ -204,16 +210,16 @@ provided by vimtex, but that are instead provided by other plugins.
     |vimtex| provides mappings that change, delete and toggle commands,
     delimiters and environments (see the `ds`, `cs` and `ts` family of
     mappings listed under |vimtex-default-mappings|).  These mappings are
-    inspired by the great `vim-surround` [0] (|surround.txt|) by Tim Pope,
+    inspired by the great `surround.vim` [0] (|surround.txt|) by Tim Pope,
     which provides mappings to manipulate surrounding delimiters such as `''`,
     `""`, `()`, `[]`, `{}`, and `<>`.  As such, the mappings from vimtex
-    should work well together with, and as an extension of, `vim-surround`.
+    should work well together with, and as an extension of, `surround.vim`.
     Consider also the customization described under |vimtex-faq-surround|.
     The mappings may be repeated with the dot mapping |.| if one has
     `vim-repeat` [1].
 
     A different possibility is to use `vim-sandwich` [2] (|sandwich.txt|) by
-    Machakann, which may be considered a generalisation of `vim-surround` in
+    Machakann, which may be considered a generalisation of `surround.vim` in
     that it can handle much more complex sets of delimiters.  `vim-sandwich`
     is relatively easy to expand with custom surroundings and has built in
     support for LaTeX-specific surroundings such as quotations, ```text''`,
@@ -222,10 +228,10 @@ provided by vimtex, but that are instead provided by other plugins.
     `vim-repeat` in addition to `visualrepeat.vim` [3].
 
     Note: The default mappings of `vim-sandwich` differ from those of
-    `vim-surround`, in that the use `s` as the prefix.  E.g., to add
+    `surround.vim`, in that the use `s` as the prefix.  E.g., to add
     surroundings, one uses `sa{motion/textobject}{type-of-surrounding}`
     instead of `ys{motion/textobject}{type-of-surrounding}`.  If one prefers
-    the map variants from `vim-surround`, these are also available as an
+    the map variants from `surround.vim`, these are also available as an
     option, see |sandwich-miscellaneous|.  And it is also easy to define
     custom mappings, if one prefers that.
 
@@ -238,6 +244,48 @@ provided by vimtex, but that are instead provided by other plugins.
     [2]: https://github.com/machakann/vim-sandwich
     [3]: http://www.vim.org/scripts/script.php?script_id=3848
 
+  Enhanced matching and higlighting of delimiters~
+    |vimtex| highlights and allows navigation between matching pairs of
+    delimiters including those in math mode, such as `\bigl(` and `\bigr)`, and
+    the `\begin` and `\end` tags of environments.  However, it does not allow
+    matching of middle delimiters or `\item`s.
+
+    Alternatively, one may use the plugin |match-up| [0], which offers enhanced
+    |matchparen| highlighting and `matchit.zip` style motions and |text-objects|
+    for a variety of file types.  For LaTeX douments, it:
+      - Extends highlighting and the `%` motion to a number of middle
+        delimiters including,
+          - `\bigm` and `\middle` marked delimiters
+          - `\item`s in `itemize` and `enumerate` environments
+          - `\toprule`, `\midrule`, `\bottomrule` in the `tabular` environment.
+          - `\if`, `\else` and `\endif`
+      - Adds motions, `g%`, `[%`, and `]%` and text objects, `a%` and `i%` which move
+        between matching delimiters and operate on delimited text.
+
+    For example, with match-up enabled, >
+
+      \left( \frac{a}{b} \middle| q \right)
+<
+    the motion `%` will cycle through `\left(`, `\middle|`, and `\right)`, whereas
+    with vimtex only `\left(` and `\right)` will be matched.  The motion `g%`
+    will do the same, except in reverse.
+
+    To enable the plugin match-up after installation, add the following to
+    your vimrc: >
+
+      let g:matchup_override_vimtex = 1
+<
+    Matching may become computationally intensive for complex LaTeX documents.
+    If you experience slowdowns while moving the cursor, the following option
+    is recommended to delay highlighting slightly while navigating: >
+
+      let g:matchup_matchparen_deferred = 1
+<
+    Note: The exact set of delimiters recognized may differ between match-up
+    and vimtex.  For example, the mappings `da%` and `dad` will not in general
+    be identical, particularly if you have customized vimtex's delimiters.
+
+    [0]: https://github.com/andymass/vim-matchup
 
 ------------------------------------------------------------------------------
 Requirements~
@@ -280,22 +328,36 @@ of its key features.  There are a couple of relevant FAQs for those who use
     but where the compilation behaviour is typically defined in the preamble
     of the document.
 
-  |clientserver|
+  *vimtex-clientserver*
     |vimtex| requires the |clientserver| for the callback functionality to
     work.  The callbacks are used to provide feedback when compilation is
     finished, as well as to parse the log for errors and warnings and to open
     the |quickfix| window when necessary.
 
-    If you use Vim under a terminal in Linux or OSX, then Vim must be
-    started as a command server with the command line option `--servername`,
-    e.g. `vim --servername VIM`.  The simplest way to ensure this is to add an
-    alias to your `.bashrc` (or similar), that is, add: >
+    A server will be started automatically if Vim is running on Windows, or
+    if running in a GUI.  If you use Vim under a terminal in Linux or OSX,
+    a server will not be started by default.  Since Vim version 8.0.475,
+    |remote_startserver()| can be used to start a server from your `vimrc`
+    file.  The following will ensure Vim starts with a server, if it is
+    possible from vimscript: >
+
+      if empty(v:servername) && exists('*remote_startserver')
+        call remote_startserver('VIM')
+      endif
+<
+    Alternatively, Vim can be started with the command line option
+    `--servername`, e.g. `vim --servername VIM` .  The simplest way to ensure
+    this is to add an alias to your `.bashrc` (or similar), that is, add: >
 
       alias vim='vim --servername VIM'
 <
-    This should work in most cases.  For other methods of ensuring that Vim is
-    started with a servername, see:
+    For other methods of ensuring that Vim is started with a servername, see:
     http://vim.wikia.com/wiki/Enable_servername_capability_in_vim/xterm
+
+    For setting up callback functionality in Neovim, see |vimtex-faq-neovim|.
+
+    To test whether a server was successfully started, |serverlist()| can be
+    used. E.g. `:echo serverlist()`
 
 ------------------------------------------------------------------------------
 Support for multi-file projects~
@@ -335,12 +397,25 @@ TeX root directive~
                                                                *vimtex-subfiles*
                                                                  *vimtex-import*
 Subfiles package~
-  |vimtex| also supports the `import` and the `subfiles` packages that can be used to
-  make it easier to work with multi-file projects. If one uses the `subfiles`
-  package, the |VimtexToggleMain| command is particularly useful.
+  |vimtex| also supports the `import` [0] and the `subfiles` [1] packages that
+  can be used to make it easier to work with multi-file projects. If one uses
+  the `subfiles` package, the |VimtexToggleMain| command is particularly
+  useful.
 
-    - https://www.ctan.org/pkg/import
-    - https://www.ctan.org/pkg/subfiles
+  With `subfiles`, included files will look like this: >
+
+    \documentclass[main.tex]{subfiles}
+    \begin{document}
+    ...
+    \end{document}
+<
+  Absolute paths for to the main file (e.g. `main.tex`) will work as expected,
+  but when using a relative path, one should note that vimtex assumes we start
+  compilation from the directory of the main file. Thus one should not write
+  e.g. `../main.tex`.
+
+  [0]: https://www.ctan.org/pkg/import
+  [1]: https://www.ctan.org/pkg/subfiles
 
 File .latexmain specifier~
   In some cases, it might be preferable to specify the main file by creating
@@ -417,16 +492,8 @@ The syntax is best explained with an example: >
 
     %! TEX program = program
 
-Here `program` may be one of the following: >
-
-  pdflatex  [default]
-  lualatex
-  xelatex
-  context (pdftex)
-  context (luatex)
-  context (xetex)
-
-See also [0,1].
+Here `program` corresponds to a key in the |g:vimtex_compiler_latexmk_engines|
+or |g:vimtex_compiler_latexrun_engines| dictionaries. See also [0,1].
 
 [0]: https://tex.stackexchange.com/q/78101/34697
 [1]: https://github.com/lervag/vimtex/issues/713
@@ -512,8 +579,7 @@ This feature is explained in more detail later, see |vimtex-imaps|.
    <localleader>lI  |<plug>(vimtex-info-full)|                      `n`
    <localleader>lt  |<plug>(vimtex-toc-open)|                       `n`
    <localleader>lT  |<plug>(vimtex-toc-toggle)|                     `n`
-   <localleader>ly  |<plug>(vimtex-labels-open)|                    `n`
-   <localleader>lY  |<plug>(vimtex-labels-toggle)|                  `n`
+   <localleader>lq  |<plug>(vimtex-log)|                            `n`
    <localleader>lv  |<plug>(vimtex-view)|                           `n`
    <localleader>lr  |<plug>(vimtex-reverse-search)|                 `n`
    <localleader>ll  |<plug>(vimtex-compile)|                        `n`
@@ -559,6 +625,14 @@ This feature is explained in more detail later, see |vimtex-imaps|.
    ][               |<plug>(vimtex-][)|                             `nxo`
    []               |<plug>(vimtex-[])|                             `nxo`
    [[               |<plug>(vimtex-[[)|                             `nxo`
+   ]m               |<plug>(vimtex-]m)|                             `nxo`
+   ]M               |<plug>(vimtex-]M)|                             `nxo`
+   [m               |<plug>(vimtex-[m)|                             `nxo`
+   [M               |<plug>(vimtex-[M)|                             `nxo`
+   ]/               |<plug>(vimtex-]/|                              `nxo`
+   ]*               |<plug>(vimtex-]star|                           `nxo`
+   [/               |<plug>(vimtex-[/|                              `nxo`
+   [*               |<plug>(vimtex-[star|                           `nxo`
    K                |<plug>(vimtex-doc-package)|                    `n`
   ---------------------------------------------------------------------~
 
@@ -636,7 +710,6 @@ Options~
         \ 'continuous' : 1,
         \ 'executable' : 'latexmk',
         \ 'options' : [
-        \   '-pdf',
         \   '-verbose',
         \   '-file-line-error',
         \   '-synctex=1',
@@ -704,11 +777,42 @@ Options~
     This is a list of options that are passed to `latexmk`. The default
     options should work well for most people.
 
+    Note: By default, the option `-pdf` is also supplied to indicate the LaTeX
+          engine. This may be changed on a per project basis with TeX
+          directives, see |vimtex-tex-program| or the two compiler-specific
+          options
+            |g:vimtex_compiler_latexmk_engines|
+            and |g:vimtex_compiler_latexrun_engines|.
+          The latter two options may also be used to change the default engine.
+
     Note: Options may also be specified indirectly to `latexmk` through both
           a global and a project specific `.latexmkrc` file. One should know,
           though, that options specified on the command line has priority, and
           so if one wants to override one of the above default options, then
           one has to set this key to a list that contains the desired options.
+
+*g:vimtex_compiler_latexmk_engines*
+  Defines a map between TeX program directive (|vimtex-tex-program|) and
+  compiler engine. This is used by |vimtex-latexmk| to define the LaTeX
+  program. The `_` key defines the default engine.
+
+  Note: If the TeX program directive is not specified within the main project
+        file, and if `$pdf_mode` is added to a project-specific `.latexmkrc`
+        file, then the compiler engine will be deduced from the value of
+        `$pdf_mode`. The supported values of `$pdf_mode` are 0 (pdflatex), 4
+        (lualatex) and 5 (xelatex). See the latexmk documentation for details.
+
+  Default value: >
+
+    let g:vimtex_compiler_latexmk_engines = {
+        \ '_'                : '-pdf',
+        \ 'pdflatex'         : '-pdf',
+        \ 'lualatex'         : '-lualatex',
+        \ 'xelatex'          : '-xelatex',
+        \ 'context (pdftex)' : '-pdf -pdflatex=texexec',
+        \ 'context (luatex)' : '-pdf -pdflatex=context',
+        \ 'context (xetex)'  : '-pdf -pdflatex=''texexec --xtx''',
+        \}
 
 *g:vimtex_compiler_latexrun*
   This is a dictionary that allows customization of the |vimtex-latexrun|
@@ -742,6 +846,29 @@ Options~
   options~
     This is a list of options that are passed to `latexrun`. The default
     options should work well for most people.
+
+    Note: By default, the option `-pdf` is also supplied to indicate the LaTeX
+          engine. This may be changed on a per project basis with TeX
+          directives, see |vimtex-tex-program| or the two compiler-specific
+          options
+            |g:vimtex_compiler_latexmk_engines|
+            and |g:vimtex_compiler_latexrun_engines|.
+          The latter two options may also be used to change the default engine.
+
+*g:vimtex_compiler_latexrun_engines*
+  Defines a map between TeX program directive (|vimtex-tex-program|) and
+  compiler engine, i.e. as should be specified to the `--latex-cmd` argument
+  to `latexrun`. This is used by |vimtex-latexrun| to define the LaTeX
+  program. The `_` key defines the default engine.
+
+  Default value: >
+
+    let g:vimtex_compiler_latexrun_engines = {
+        \ '_'                : 'pdflatex',
+        \ 'pdflatex'         : 'pdflatex',
+        \ 'lualatex'         : 'lualatex',
+        \ 'xelatex'          : 'xelatex',
+        \}
 
 *g:vimtex_compiler_arara*
   This is a dictionary that allows customization of the |vimtex-arara|
@@ -1188,6 +1315,48 @@ Options~
 
   Default value: 1
 
+*g:vimtex_indent_conditionals*
+  This is a dictionary that defines regexes for indenting conditionals. Set it
+  to an empty dictionary to disable this type of indentation.
+
+  Default value: >
+    let g:vimtex_indent_conditionals = {
+          \ 'open': '\v%(\\newif)@<!\\if%(field|name|numequal|thenelse)@!',
+          \ 'else': '\\else\>',
+          \ 'close': '\\fi\>',
+          \}
+
+*g:vimtex_indent_delims*
+  A dictionary that defines the list of opening and closing delimiters (in
+  regex form) that should add/reduce indents.
+
+  The dictionary has three keys:
+
+    open~
+      List of regexes that defines opening delimiters that should add indents.
+
+    close~
+      List of regexes that defines closing delimiters that should reduce
+      indents.
+
+    include_modified_math~
+      Boolean (1 for True, 0 for False) that sets whether to indent on opening
+      and closing modified math delimiters such as `\left(` and `\right)`. If
+      this value is not set, it is assumed to be 1.
+
+  Note: Vimtex does not allow indents for parantheses only in math mode or any
+        similar kind of context aware delimiter indents.
+
+  Note: If one of the keys of the dictionary is not specified, the default
+        value is assumed.
+
+  Default value: >
+    let g:vimtex_indent_delims = {
+          \ 'open' : ['{', '\\\@<!\\\['],
+          \ 'close' : ['}', '\\\]'],
+          \ 'include_modified_math' : 1,
+          \}
+
 *g:vimtex_indent_ignored_envs*
   List of environments that should not add/reduce indentation.
 
@@ -1209,37 +1378,6 @@ Options~
   may be disabled through this option.
 
   Default value: 1
-
-*g:vimtex_index_hide_line_numbers*
-  If enabled, then line numbers will be hidden in the index windows.  That is,
-  |nonumber| and |norelativenumber| will be set locally.
-
-  Default value: 1
-
-*g:vimtex_index_resize*
-  Whether or not to automatically resize vim when index windows are opened.
-
-  Note: This option makes sense if the index window is vertically split.
-
-  Default value: 0
-
-*g:vimtex_index_show_help*
-  Whether to display the index help text.
-
-  Default value: 1
-
-*g:vimtex_index_split_pos*
-  Define where index windows should be opened. This is a string that contains
-  either the word 'full' to open in the current window, or any of the position
-  commands, i.e. one or more of |:vertical|, |:leftabove|, |:rightbelow|, |:topleft|,
-  and |:botright|.
-
-  Default value: 'vert leftabove'
-
-*g:vimtex_index_split_width*
-  For vertically split windows: Set width of index window.
-
-  Default value: 30
 
 *g:vimtex_mappings_enabled*
   Control whether or not to load the default mappings.
@@ -1275,28 +1413,20 @@ Options~
 
   Default value: 1
 
-*g:vimtex_labels_enabled*
-  Use this option to disable/enable table of labels.
+*g:vimtex_log_ignore*
+  A list of regexes to filter info, warning, and error messages. If a logged
+  message matches any of the regexes in this list, the message will not be
+  printed to screen.
 
-  Default value: 1
+  Note: All messages may still be viewed with |VimtexLog|.
 
-*g:vimtex_labels_refresh_always*
-  Set to 0 to manually refresh entries in the table of labels. This may be
-  useful for very large projects where generating the entries becomes slow.
+  Default: []
 
-  It may be useful to combine manually refreshing with a |BufWritePost|
-  autocommand, e.g.: >
+*g:vimtex_log_verbose*
+  Whether or not to print messages to screen. Should generally be on, but may
+  be turned off e.g. for debugging or testing purposes.
 
-    augroup vimtex
-      autocmd!
-      autocmd BufWritePost *.tex call vimtex#labels#refresh()
-    augroup END
-<
-  Or, if preferred, one may use a mapping such as: >
-
-    nnoremap <silent> <localleader>lf :call vimtex#labels#refresh()
-<
-  Default value: 1
+  Default: 1
 
 *g:vimtex_quickfix_enabled*
   Use this option to disable/enable the quickfix integration.
@@ -1311,16 +1441,19 @@ Options~
     |g:vimtex_quickfix_latexlog| for configuration.
 
   pplatex~
-    Uses `pplatex` [0] to parse the LaTeX output file. `pplatex` is a command line
-    utility used to pretify the output of the LaTeX compiler.
+    Uses `pplatex` (https://github.com/stefanhepp/pplatex) to parse the LaTeX
+    output file. `pplatex` is a command line utility used to pretify the
+    output of the LaTeX compiler.
 
-    [0]: https://github.com/stefanhepp/pplatex
+  pulp~
+    Uses `pulp` (https://github.com/dmwit/pulp) to parse the LaTeX output
+    file, similar to `pplatex`.
 
-    Note: `pplatex` requires that `-file-line-error` is NOT passed to the LaTeX
-    compiler. |g:vimtex_compiler_latexmk| will be updated automatically if one
-    uses `latexmk` through vimtex. However, if one uses other compiler
-    methods, either through vimtex (see |g:vimtex_compiler_method|) or
-    externally, this requirement must be ensured by the user.
+  Note: `pplatex` and `pulp` require that `-file-line-error` is NOT passed to the LaTeX
+  compiler. |g:vimtex_compiler_latexmk| will be updated automatically if one
+  uses `latexmk` through vimtex. However, if one uses other compiler
+  methods, either through vimtex (see |g:vimtex_compiler_method|) or
+  externally, this requirement must be ensured by the user.
 
   Default value: 'latexlog'
 
@@ -1396,7 +1529,7 @@ Options~
   and/or warnings are found.  The recognized options are:
 
   Value  Effect ~
-  0      The quickfix window is never opened automatically.
+  0      The quickfix window is never opened/closed automatically.
   1      The quickfix window is opened automatically when there are errors,
          and it becomes the active window.
   2      The quickfix window is opened automatically when there are errors,
@@ -1413,6 +1546,11 @@ Options~
   there are warning messages and no error messages.
 
   Default value: 1
+
+*g:vimtex_syntax_enabled*
+  Use this option to disable/enable |vimtex| improved syntax highlighting.
+
+  Default value: 1.
 
 *g:vimtex_syntax_minted*
   A list that contains dictionaries for each supported language.  A language
@@ -1453,6 +1591,12 @@ Options~
           \ }
           \]
 
+*g:vimtex_texcount_custom_arg*
+  Option that makes it possible to add custom arguments to `texcount` for
+  |VimtexCountWords| and |VimtexCountLetters|.
+
+  Default value: ''
+
 *g:vimtex_text_obj_enabled*
   Use this option to disable the text object mappings.
 
@@ -1471,14 +1615,14 @@ Options~
   Default value: 1
 
 *g:vimtex_toc_custom_matchers*
-  This option is a list of custom TOC matchers. A matcher is used to define
-  the entries that are included in the TOC window. It is implemented as
+  This option is a list of custom ToC matchers. A matcher is used to define
+  the entries that are included in the ToC window. It is implemented as
   a |Dictionary| with a specified set of keys, see below for the
   specification.
 
-  As an example, one can use this option to add TOC entries for a custom
+  As an example, one can use this option to add ToC entries for a custom
   environment. Say you have defined an environment `mycustomenv`, then
-  instances of this environment could be added to the TOC with the following
+  instances of this environment could be added to the ToC with the following
   configuration: >
 
     let g:vimtex_toc_custom_matchers = [
@@ -1489,7 +1633,7 @@ Options~
   Default value: []
 
                                                     *toc_matcher_specification*
-  A TOC matcher is defined as a |Dictionary| where the possible keys are
+  A ToC matcher is defined as a |Dictionary| where the possible keys are
   specified below. In order to write a matcher, one should also be aware of
   the `context` argument that is passed to the matcher functions, as well as
   the specification of the `toc entry` return value. However, since this kind
@@ -1501,32 +1645,42 @@ Options~
       Type: |String|
       Required: `yes`
       This specifies a regular expression that should match the current line
-      for the desired TOC entry.
+      for the desired ToC entry.
+
+    prefilter~
+      Type: |String|
+      Required: `maybe`
+      This specifies a `simplified` regular expression that should match the
+      current line for the desired ToC entry. This is used in order to make
+      things faster. The `re` key may often be a complex and therefore slow
+      regular expression. This key should represent a simple and fast regular
+      expression that may match more then the desired entry.
+
+    in_preamble~
+      Type: 0 or 1
+      Required: `yes`
+      If the entry may appear in the preamble.
+
+    in_content~
+      Type: 0 or 1
+      Required: `yes`
+      If the entry may appear in the main content.
 
     title~
       Type: |String|
       Required: `no`
-      If the matcher does not have an `action` or `get_entry` key, then it
-      will use a simple, general matcher function to generate the entry. In
-      this case, the `title` key should be specified to give the title of the
-      TOC entry.
-
-    action~
-      Type: |Dictionary-function|
-      Arguments: `context`
-      Required: `no`
-      This key specifies a general action to be performed with the given
-      context on matching lines. It will not add entries to the TOC, and
-      is probably not useful for most people.
+      If the matcher does not have a `get_entry` key, then it will use
+      a simple, general matcher function to generate the entry. In this case,
+      the `title` key should be specified to give the title of the ToC entry.
 
     get_entry~
       Type: |Dictionary-function|
       Arguments: `context`
       Returns: `toc entry`
       Required: `no`
-      This is the general way to define TOC entries. It allows to define the
-      TOC entry based on the context. See e.g.
-      `g:vimtex#toc#matchers#sections` for an example on how to use this.
+      This is the general way to define ToC entries. It allows to define the
+      ToC entry based on the context. See `autoload/vimtex/parser/toc.vim` for
+      examples on how to use this.
 
     continue~
       Type: |Dictionary-function|
@@ -1535,80 +1689,119 @@ Options~
       Required: `no`
       Some entries may be specified over several lines, in which case this key
       becomes necessary in combination with the `get_entry` key. See the built
-      in matcher `g:vimtex#toc#matchers#sections` for an example on how to use
-      this.
+      in `s:matcher_section` matcher for an example on how to use this.
 
-*g:vimtex_toc_fold*
-  Turn on folding of ToC entries.
+*g:vimtex_toc_todo_keywords*
+  Set list of keywords that should be recognized in comments for the todo
+  layer.
 
-  Default value: 0
-
-*g:vimtex_toc_fold_level_start*
-  This option controls the initial fold level for the TOC window if folding is
-  enabled.
-
-  Default value: Same as |g:vimtex_toc_tocdepth|
-
-*g:vimtex_toc_hotkeys*
-  This option controls whether or not to activate individual hotkeys for the
-  TOC entries, and how these hotkeys should behave.  The option is
-  a dictionary with the following keys:
-
-    `enabled`  Set to 1 to enable individual hotkeys.
-    `leader`   The leader key for the hotkeys.
-    `keys`     The set of keys that are used for the hotkeys.
-
-  Default value: >
-
-    let g:vimtex_toc_hotkeys = {
-        \ 'enabled' : 0,
-        \ 'leader' : ';',
-        \ 'keys' : 'abcdefghijklmnopqrstuvxyz',
-        \}
-
-*g:vimtex_toc_refresh_always*
-  Set to 0 to manually refresh ToC entries. This may be useful for very large
-  projects where generating the ToC entries becomes slow.
-
-  It may be useful to combine manually refreshing with a |BufWritePost|
-  autocommand, e.g.: >
-
-    augroup vimtex
-      autocmd!
-      autocmd BufWritePost *.tex call vimtex#toc#refresh()
-    augroup END
-<
-  Or, if preferred, one may use a mapping such as: >
-
-    nnoremap <silent> <localleader>lf :call vimtex#toc#refresh()
-<
-  Default value: 1
+  Default value: `['TODO', 'FIXME']`
 
 *g:vimtex_toc_show_preamble*
   Whether to include the preamble in the ToC.
 
   Default value: 1
 
-*g:vimtex_toc_show_numbers*
-  Set whether or not to show section numbers in ToC.
+*g:vimtex_toc_config*
+  This is a dictionary that can be used to configure the ToC. Each key
+  specifies a configuration option that can be changed. In the following, the
+  various keys are explained briefly and the default value is indicated.
 
-  Note: The numbers may also be toggled inside the ToC window with the `s`
-        keybinding.
+    `name` : `Table of contents (vimtex)`
+      The name of the ToC buffer.
 
-  Default value: 1
+    `mode` : 1
+      The ToC display mode, one of:
+        1: Separate window.
+        2: Separate window and location list.
+        3: Location list (and don't open it).
+        4: Location list (and open it).
 
-*g:vimtex_toc_tocdepth*
-  Define the number of section levels to display.  Set level corresponding to
-  the desired latex variable `tocdepth`.  For more info on `tocdepth`, see:
-  http://en.wikibooks.org/w/index.php?title=LaTeX/Document_Structure
+    `fold_enable` : 0
+      Wheter to enable folding in the ToC window.
 
-  Note: This will also change the width of the number column according to the
-        space needed to show the section numbers.
+    `fold_level_start` : -1
+      The starting fold level. The value -1 indicates that the start level is
+      the same as the `tocdepth` value.
 
-  Note: The variable may be updated inside the ToC window with the mappings
-        `+` and `-`.
+    `hide_line_numbers` : 1
+      If enabled, then line numbers will be hidden in the ToC window by
+      setting |nonumber| and |norelativenumber| locally.
 
-  Default value: 3
+    `hotkeys_enabled` : 0
+      Set to 1 to enable individual hotkeys for ToC entries.
+
+    `hotkeys` : `abcdegijklmnopuvxyz`
+      A string of keys that are used to create individual hotkeys.
+
+    `hotkeys_leader` : `;`
+      The hotkey leader. Set to empty string to disable the leader.
+
+    `layers` : Undefined
+    `layer_status` : Dictionary >
+        { 'content': 1,
+          'label': 1,
+          'todo': 1,
+          'include': 1 }
+<      The initial state of the layers (1 for active, 0 for inactive). The
+      `layers` key may be used as a shorthand: it accepts a list of layers
+      that should be active.
+
+    `layer_keys` : Dictionary >
+        { 'content': 'C',
+          'label': 'L',
+          'todo': 'T',
+          'include': 'I'}
+<      Specify hotkeys for enabling/disabling the different layers.
+
+    `resize` : 0
+      Whether or not to automatically resize vim when index windows are
+      opened.
+
+      Note: This option makes sense if the index window is vertically split.
+
+    `refresh_always` : 1
+      Set to 0 to manually refresh ToC entries. This may be useful for very
+      large projects where generating the ToC entries becomes slow.
+
+      It may be useful to combine manually refreshing with a |BufWritePost|
+      autocommand, e.g.: >
+
+        augroup vimtex
+          autocmd!
+          autocmd BufWritePost *.tex call vimtex#toc#refresh()
+        augroup END
+<
+      Or, if preferred, one may use a mapping such as: >
+
+        nnoremap <silent> <localleader>lf :call vimtex#toc#refresh()
+<
+    `show_help` : 1
+      Whether to display the index help text.
+
+    `show_numbers` : 1
+      Set whether or not to show section numbers in ToC.
+
+    `split_pos` : `vert leftabove`
+      Define where index windows should be opened. This is a string that
+      contains either the word 'full' to open in the current window, or
+      a position command. Use |:vert| if a vertical split is desired, and one
+      of |:leftabove|, |:rightbelow|, |:topleft|, and |:botright| to specify
+      the desired split position.
+
+    `split_width` : 30
+      For vertically split windows: Set width of index window.
+
+    `tocdepth` : 3
+      Define the depth of section levels to display. This attempts to mimic
+      the corresponding latex variable `tocdepth`. For more info, see:
+      http://en.wikibooks.org/w/index.php?title=LaTeX/Document_Structure
+
+      Note: This will also change the width of the number column according to
+            the space needed to show the section numbers.
+
+    `todo_sorted` : 1
+      Whether or not to sort the TODOs at the top of the ToC window.
 
 *g:vimtex_view_enabled*
   Use this option to disable/enable the |vimtex| viewer interface.
@@ -1655,15 +1848,18 @@ Options~
             let g:vimtex_view_general_viewer = 'okular'
             let g:vimtex_view_general_options = '--unique file:@pdf\#src:@line@tex'
             let g:vimtex_view_general_options_latexmk = '--unique'
-
-<          Backward search must be set up from the viewer through
-          Settings > Editor > Custom Text Editor. The following settings
+<
+          Backward search must be set up from the viewer through
+          "Settings > Editor > Custom Text Editor". The following settings
           should work for Vim and neovim (Note: see |vimtex_faq_neovim|),
           respectively: >
 
             vim --remote-silent %f -c %l
             nvr --remote-silent %f -c %l
 <
+          Note: To perform a backward (or inverse) search in Okular, you do
+                "shift + click", not "ctrl + click" as in most other viewers.
+
         *vimtex_viewer_qpdfview*
           https://launchpad.net/qpdfview
           qpdfview is a tabbed document viewer.  It supports forward search.
@@ -1727,9 +1923,8 @@ Options~
             `latexmk` (or other build tools) from starting Skim and instead
             let vimtex start Skim through the callback feature.
 
-      Note: See the Skim wiki for documentation on how to get backward
-            search to work:
-            https://sourceforge.net/p/skim-app/wiki/TeX_and_PDF_Synchronization
+      Note: See |vimtex-faq-skimviewer| for more info on how to properly set
+            up the Skim viewer for backward search.
 
     *vimtex_viewer_zathura*
       https://pwmt.org/projects/zathura/
@@ -1840,6 +2035,18 @@ Options~
 
   Default value: ''
 
+*g:vimtex_view_skim_activate*
+  Set this option to 1 to make Skim have focus after command |:VimtexView| in
+  addition to being moved to the foreground.
+
+  Default value: 0
+
+*g:vimtex_view_skim_reading_bar*
+  Set this option to 1 to highlight current line in PDF after command
+  |:VimtexView|.
+
+  Default value: 1
+
 *g:vimtex_view_zathura_options*
   Set options for zathura (|vimtex_viewer_zathura|).
 
@@ -1880,13 +2087,10 @@ Commands~
                                              *<plug>(vimtex-toc-toggle)*
 :VimtexTocToggle          Toggle table of contents.
 
-                                             *VimtexLabelsOpen*
-                                             *<plug>(vimtex-labels-open)*
-:VimtexLabelsOpen         Open table of labels.
-
-                                             *VimtexLabelsToggle*
-                                             *<plug>(vimtex-labels-toggle)*
-:VimtexLabelsToggle       Toggle table of labels.
+                                             *VimtexLog*
+                                             *<plug>(vimtex-log)*
+:VimtexLog                Show message log with timestamps and traces from
+                          where the messages were raised.
 
                                              *VimtexCompile*
                                              *<plug>(vimtex-compile)*
@@ -1974,28 +2178,39 @@ Commands~
 
                                              *VimtexCountLetters*
                                              *VimtexCountWords*
+                                             *vimtex#misc#wordcount(opts)*
 :VimtexCountLetters       Shows the number of letters/characters or words in
-:VimtexCountWords         the current project. The count is created with
-                          `texcount` through a call on the main project file
-                          similar to: >
+:VimtexCountWords         the current project or in the selected region. The
+                          count is created with `texcount` through a call on
+                          the main project file similar to: >
 
-                            texcount -nosub -sum [-letter] -merge FILE
+                            texcount -nosub -sum [-letter] -merge -q -1 FILE
 <
+                          Note: Default arguments may be controlled with
+                                |g:vimtex_texcount_custom_arg|.
+
+                          Note: One may access the information through the
+                                function `vimtex#misc#wordcount(opts)`, where
+                                `opts` is a dictionary with the following
+                                keys (defaults indicated): >
+
+                                'range' : [1, line('$')]
+                                'count_letters' : 0/1
+                                'detailed' : 0
+<
+                                If `detailed` is 0, then it only returns the
+                                total count. This makes it possible to use for
+                                e.g. statusline functions. If the `opts` dict
+                                is not passed, then the defaults are assumed.
+
                                              *VimtexCountLetters!*
                                              *VimtexCountWords!*
 :VimtexCountLetters!      Similar to |VimtexCountLetters|/|VimtexCountWords|, but
 :VimtexCountWords!        show separate reports for included files.  I.e.
-                          presents the result of >
+                          presents the result of: >
 
                             texcount -nosub -sum [-letter] -inc FILE
 <
-                                             *VimtexCountSelectedWords*
-                                             *VimtexCountSelectedWords!*
-                                             *VimtexCountSelectedLetters*
-                                             *VimtexCountSelectedLetters!*
-                          These commands are the same as the above, but they
-                          work on selections.
-
                                              *VimtexImapsList*
                                              *<plug>(vimtex-imaps-list)*
 :VimtexImapsList          Show the list of insert mode mappings created by the
@@ -2114,17 +2329,52 @@ object, see |text-objects|.
   Find matching pair.
 
 *<plug>(vimtex-]])*
-  [count] section forward (|exlusive|). Goes to next section command.
+  go to [count] next end of a section.
+  |exlusive| motion.
 
 *<plug>(vimtex-][)*
-  [count] section end forward (|exlusive|). Goes to line before next section command or to
-  bottom of document or to bottom of file.
+  go to [count] next beginning of a section.
+  |exlusive| motion.
 
 *<plug>(vimtex-[])*
-  [count] section end backward (|exlusive|). Goes to the end of the previous section.
+  go to [count] previous end of a section.
+  |exlusive| motion.
 
 *<plug>(vimtex-[[)*
-  [count] section backward (|exlusive|). Goes to previous section command.
+  go to [count] previous beginning of a section.
+  |exlusive| motion.
+
+*<plug>(vimtex-]m)*
+  go to [count] next start of an environment `\begin`.
+  |exlusive| motion.
+
+*<plug>(vimtex-]M)*
+  go to [count] next end of an environment `\end`.
+  |exlusive| motion.
+
+*<plug>(vimtex-[m)*
+  go to [count] previous start of an environment `\begin`.
+  |exlusive| motion.
+
+*<plug>(vimtex-[M)*
+  go to [count] previous end of an environment `\end`.
+  |exlusive| motion.
+
+*<plug>(vimtex-]/)*
+  go to [count] next start of a LaTeX comment "%".
+  |exlusive| motion.
+
+*<plug>(vimtex-]star)*
+  go to [count] next end of a LaTeX comment "%".
+  |exlusive| motion.
+
+*<plug>(vimtex-[/)*
+  go to [count] previous start of a LaTeX comment "%".
+  |exlusive| motion.
+
+*<plug>(vimtex-[star)*
+  go to [count] previous end of a LaTeX comment "%".
+  |exlusive| motion.
 
 ------------------------------------------------------------------------------
 Insert mode mappings~
@@ -2359,14 +2609,20 @@ number.  The label completion matches:
         \eqref{eq 2<CTRL-X><CTRL-O>
 
 ------------------------------------------------------------------------------
-Complete commands~
+Complete commands and environments~
                                                      *vimtex-complete-commands*
+                                                 *vimtex-complete-environments*
 
 Command completion is available after `\` and should provide completion
 candidates for relevant LaTeX commands.  The document's preamble is analysed,
-and commands will be completed for the loaded packages. A lot of packages are
-supported, see the path `VIMTEX/autoload/vimtex/complete` for a relevant file
-listing.
+and commands will be completed for the loaded packages as well as those
+defined within the preamble using `\newcommand`, `\let` and `\def`.  Environment
+completion is also available after `\begin{` or `\end{`.  As with commands, the
+suggested environment names come from the loaded packages and `\newenvironment`
+definitions in the preamble.
+
+A lot of packages are supported, see the path `VIMTEX/autoload/vimtex/complete`
+for a relevant file listing.
 
 ------------------------------------------------------------------------------
 Complete file names for figures~
@@ -2433,16 +2689,31 @@ Autocomplete~
                                                          *vimtex-complete-auto*
 
 Vim does not provide automatic completion by itself, but there exist at least
-four good plugins that provide this: |neocomplete|, |deoplete|,
-|nvim-completion-manager| and |youcompleteme|.  Moreover, there is
-|VimCompletesMe| that overrides <tab> to trigger different built-in
-completions, such as the omni-completion by vimtex, depending on the context.
-See below for descriptions on how to setup these with |vimtex|.
+four good plugins that provide this: ||deoplete|, |neocomplete|, |ncm2|,
+|nvim-completion-manager| and |youcompleteme|.  Moreover, there is |VimCompletesMe|
+that overrides <tab> to trigger different built-in completions, such as the
+omni-completion by vimtex, depending on the context. See below for
+descriptions on how to setup these with |vimtex|.
+
+deoplete~
+                                                     *vimtex-complete-deoplete*
+|deoplete| is a modern remake of |neocomplete|, and was originally written
+specifically for Neovim, see here: https://github.com/Shougo/deoplete.nvim. It
+is a highly customizable and flexible completion manager.
+
+To configure for `vimtex`, one may use: >
+
+  if !exists('g:deoplete#omni#input_patterns')
+      let g:deoplete#omni#input_patterns = {}
+  endif
+  let g:deoplete#omni#input_patterns.tex = g:vimtex#re#deoplete
 
 neocomplete~
                                                   *vimtex-complete-neocomplete*
-|neocomplete| is my preferred choice for an automatic completion engine in vim.
-The plugin is available here: https://github.com/Shougo/neocomplete.vim.
+|neocomplete| is also a flexible automatic completion engine for vim, although
+active development has been stopped. Users are recommended to change to
+|deoplete|, see also |vimtex-complete-deoplete|. The plugin is available here:
+https://github.com/Shougo/neocomplete.vim.
 
 The following options may be used to enable automatic completion for LaTeX
 documents with |neocomplete| and |vimtex|s omni completion function: >
@@ -2453,19 +2724,101 @@ documents with |neocomplete| and |vimtex|s omni completion function: >
   let g:neocomplete#sources#omni#input_patterns.tex =
         \ g:vimtex#re#neocomplete
 
-deoplete~
-                                                     *vimtex-complete-deoplete*
-|deoplete| is similar to |neocomplete|, but is written specifically for Neovim, see
-here: https://github.com/Shougo/deoplete.nvim. To configure for `vimtex`, one
-may use: >
+ncm2~
+                                                         *vimtex-complete-ncm2*
+|ncm2| is a modern remake and replacement of |nvim-completion-manager| and is
+supposed to be a "Slim, Fast and Hackable Completion Framework for Neovim":
+https://github.com/ncm2/ncm2
 
-  if !exists('g:deoplete#omni#input_patterns')
-      let g:deoplete#omni#input_patterns = {}
-  endif
-  let g:deoplete#omni#input_patterns.tex = g:vimtex#re#deoplete
+The following simple configuration should work well with `vimtex`: >
 
+  " include the following plugins (here using junnegun/vim-plug)
+  Plug 'roxma/nvim-yarp'
+  Plug 'ncm2/ncm2'
+
+  set completeopt=noinsert,menuone,noselect
+
+  augroup my_cm_setup
+    autocmd!
+    autocmd BufEnter * call ncm2#enable_for_buffer()
+    autocmd Filetype tex call ncm2#register_source({
+            \ 'name': 'vimtex',
+            \ 'priority': 8,
+            \ 'scope': ['tex'],
+            \ 'mark': 'tex',
+            \ 'word_pattern': '\w+',
+            \ 'complete_pattern': g:vimtex#re#ncm2,
+            \ 'on_complete': ['ncm2#on_complete#omni', 'vimtex#complete#omnifunc'],
+            \ })
+  augroup END
+<
+For more lenient, omni-complete-like, filtering of completion candidates, 
+use the following setup (in your init.vim or a personal ftplugin) instead: >
+
+  augroup my_cm_setup
+    autocmd!
+    autocmd BufEnter * call ncm2#enable_for_buffer()
+    autocmd Filetype tex call ncm2#register_source({
+            \ 'name' : 'vimtex-cmds',
+            \ 'priority': 8, 
+            \ 'complete_length': -1,
+            \ 'scope': ['tex'],
+            \ 'matcher': {'name': 'prefix', 'key': 'word'},
+            \ 'word_pattern': '\w+',
+            \ 'complete_pattern': g:vimtex#re#ncm2#cmds,
+            \ 'on_complete': ['ncm2#on_complete#omni', 'vimtex#complete#omnifunc'],
+            \ })
+    autocmd Filetype tex call ncm2#register_source({
+            \ 'name' : 'vimtex-labels',
+            \ 'priority': 8, 
+            \ 'complete_length': -1,
+            \ 'scope': ['tex'],
+            \ 'matcher': {'name': 'combine',
+            \             'matchers': [
+            \               {'name': 'substr', 'key': 'word'},
+            \               {'name': 'substr', 'key': 'menu'},
+            \             ]},
+            \ 'word_pattern': '\w+',
+            \ 'complete_pattern': g:vimtex#re#ncm2#labels,
+            \ 'on_complete': ['ncm2#on_complete#omni', 'vimtex#complete#omnifunc'],
+            \ })
+    autocmd Filetype tex call ncm2#register_source({
+            \ 'name' : 'vimtex-files',
+            \ 'priority': 8, 
+            \ 'complete_length': -1,
+            \ 'scope': ['tex'],
+            \ 'matcher': {'name': 'combine',
+            \             'matchers': [
+            \               {'name': 'abbrfuzzy', 'key': 'word'},
+            \               {'name': 'abbrfuzzy', 'key': 'abbr'},
+            \             ]},
+            \ 'word_pattern': '\w+',
+            \ 'complete_pattern': g:vimtex#re#ncm2#files,
+            \ 'on_complete': ['ncm2#on_complete#omni', 'vimtex#complete#omnifunc'],
+            \ })
+    autocmd Filetype tex call ncm2#register_source({
+            \ 'name' : 'bibtex',
+            \ 'priority': 8, 
+            \ 'complete_length': -1,
+            \ 'scope': ['tex'],
+            \ 'matcher': {'name': 'combine',
+            \             'matchers': [
+            \               {'name': 'prefix', 'key': 'word'},
+            \               {'name': 'abbrfuzzy', 'key': 'abbr'},
+            \               {'name': 'abbrfuzzy', 'key': 'menu'},
+            \             ]},
+            \ 'word_pattern': '\w+',
+            \ 'complete_pattern': g:vimtex#re#ncm2#bibtex,
+            \ 'on_complete': ['ncm2#on_complete#omni', 'vimtex#complete#omnifunc'],
+            \ })
+  augroup END
+<
 nvim-completion-manager~
                                                           *vimtex-complete-ncm*
+Note: |nvim-completion-manager| has been replaced by |ncm2|, and users are
+recommended to change. See |vimtex-complete-ncm2| for hints on how to setup
+|ncm2| for vimtex.
+
 |nvim-completion-manager| is a fast, extensible, async completion framework
 for neovim (and Vim version 8.0 and above).  The project is available here:
 https://github.com/roxma/nvim-completion-manager
@@ -2566,6 +2919,7 @@ for bibliography files (`.bib` files).
 Associated settings:
   |g:vimtex_indent_enabled|
   |g:vimtex_indent_bib_enabled|
+  |g:vimtex_indent_delims|
   |g:vimtex_indent_ignored_envs|
   |g:vimtex_indent_lists|
   |g:vimtex_indent_on_ampersands|
@@ -2589,97 +2943,39 @@ selectively enable or disable highlighting for specific groups.  If
 |g:tex_fast| is set, additional syntax highlighting for bold, italic, and
 reference groups are enabled only if they are explicitly allowed.
 
+Note: The default syntax highlighting of vim maintained by Charles Campbell
+      does not support any package (:h tex-package). However, C. Campbell
+      provides syntax highlighting files on his website for
+      - `amsmath`
+      - `array`
+      - `lstlisting`
+      - `moreverb`
+      - `slide`
+      http://www.drchip.org/astronaut/vim/index.html#LATEXPKGS
+
+Note: For people that are interested in improved conceal support, please check
+      out Keita Nakamura's plugin tex-conceal.vim:
+      https://github.com/KeitaNakamura/tex-conceal.vim
+
+Associated settings:
+  |g:vimtex_syntax_enabled|
+  |g:vimtex_syntax_minted|
+
 ==============================================================================
 NAVIGATION                                                  *vimtex-navigation*
-                                                                 *vimtex-index*
 
-The |vimtex-index| is an interface that is used to display lists and indexes
-in vertically or horizontally split windows.  It supports custom keybindings
-inside the index window, including actions on the list elements.  The position
-of the window is controlled by |g:vimtex_index_split_pos|.  By default, the
-top of the buffer will display help text to explain the local keybindings.
-This may be turned off with |g:vimtex_index_show_help|.
+Vim already has a lot of useful navigation related features, such as
+|tags-and-searches| and |include-search|. |vimtex| improves the latter feature
+by setting the 'include' and 'includeexpr' options, see |vimtex-includeexpr|.
 
-The |vimtex-index| interface is used by the table of contents |vimtex-toc| and
-the table of labels |vimtex-labels|.
+|vimtex| also provides a separate table-of-content feature. This works by
+parsing the LaTeX project and displaying a table of contents in a separate
+window. For more info, see |vimtex-toc|.
 
-Associated settings:
-  |g:vimtex_index_hide_line_numbers|
-  |g:vimtex_index_resize|
-  |g:vimtex_index_show_help|
-  |g:vimtex_index_split_pos|
-  |g:vimtex_index_split_width|
-
-------------------------------------------------------------------------------
-Table of contents~
-                                                                   *vimtex-toc*
-
-|vimtex-toc| shows a table of contents (ToC) for the current LaTeX document.
-The ToC entries may be activated/jumped to with <cr> or <space>.  The local
-keybindings are described if |g:vimtex_index_show_help| is enabled.
-
-One may force file input entries into the ToC through designated comments with
-the following syntax: >
-
-  % vimtex-include: /path/to/file
-
-The path may be absolute or relative. In the latter case, it will be relative
-to the current root (as printed by |:VimtexInfo|). This will add an entry in
-the ToC which makes it easy to open any file. Any file opened through the ToC
-that was included in this manner will be linked to the current vimtex project,
-and thus the ToC and similar commands will be available, even if the file is
-not a LaTeX file.
-
-The TOC parser uses a list of matchers to parse the LaTeX project for the TOC
-entries. One may add custom matchers through |g:vimtex_toc_custom_matchers|.
-See also |toc_matcher_specification| for a specification of the matcher
-objects.
-
-Associated settings:
-  |g:vimtex_toc_enabled|
-  |g:vimtex_toc_custom_matchers|
-  |g:vimtex_toc_fold|
-  |g:vimtex_toc_fold_level_start|
-  |g:vimtex_toc_hotkeys|
-  |g:vimtex_toc_refresh_always|
-  |g:vimtex_toc_show_preamble|
-  |g:vimtex_toc_show_numbers|
-  |g:vimtex_toc_tocdepth|
-
-------------------------------------------------------------------------------
-Table of labels~
-                                                                *vimtex-labels*
-
-|vimtex-labels| shows a table of labels similar to the ToC.  The table entries
-may be filtered with the `f` keybinding.  Filters may be removed with the `c`
-keybinding.
-
-Associated settings:
-  |g:vimtex_labels_enabled|
-
-------------------------------------------------------------------------------
-Unite sources~
-                                                                 *vimtex-unite*
-                                                                   *vimtex_toc*
-                                                                *vimtex_labels*
-
-                                          https://github.com/Shougo/unite.vim
-The |unite.vim| plugin is a popular interface for many things, including
-outlines. Although |vimtex| includes a simple interface for tables of contents
-and labels, it also makes sense to provide these as sources to |unite.vim|.
-The source names are:
-
-  vimtex_toc       Table of contents
-  vimtex_labels    Table of labels
-
-The sources use similar syntax highlighting to the internal |vimtex|
-interfaces.
-
-If one prefers the |unite.vim| sources to the |vimtex| interface, one may
-override the default mappings, e.g.: >
-
-  nnoremap <localleader>lt :<c-u>Unite vimtex_toc<cr>
-  nnoremap <localleader>ly :<c-u>Unite vimtex_labels<cr>
+The "engine" for collecting the table-of-content entries may also be used as
+a backend for external plugins. There are sources for |denite.nvim| and
+|unite.vim| that should work well. The source code may be used as inspiration
+to write custom sources or sources for other, similar plugins.
 
 ------------------------------------------------------------------------------
 Include expression~
@@ -2698,6 +2994,103 @@ following example: >
 With the cursor on the documentclass name `article` or one of the package
 names, |gf| will take you to the TeX source files (typically `.cls` file for
 documentclass and `.sty` files for packages).
+
+------------------------------------------------------------------------------
+Table of contents~
+                                                                   *vimtex-toc*
+
+|vimtex-toc| displays a table of contents (ToC) for the current LaTeX document.
+The ToC entries may be activated/jumped to with <cr> or <space>. There are
+currently four different "layers" of entries:
+
+- content  This is the main part and the "real" ToC
+- todo     This shows TODOs from comments and `\todo{...}` commands
+- label    This shows `\label{...}` commands
+- include  This shows included files
+
+The ToC is configured with |g:vimtex_toc_config|. One may change things from
+where the ToC window is positioned to which layers to show and more. Please
+read the option help for details.
+
+The ToC parser uses a list of matchers to parse the LaTeX project for the ToC
+entries. One may add custom matchers through the |g:vimtex_toc_custom_matchers|
+option. The syntax of a custom matcher is specified here:
+|toc_matcher_specification|.
+
+Note: By setting the `mode` configuration key to > 2, the separate ToC window
+is not opened and most of the features mentioned here will be irrelevant.
+
+One may force file input entries of the "include" type into the ToC through
+comments with the following syntax: >
+
+  % vimtex-include: /path/to/file
+
+The path may be absolute or relative. In the latter case, it will be relative
+to the current root (as printed by |:VimtexInfo|). This will add an entry in
+the ToC which makes it easy to open any file. Any file opened through the ToC
+that was included in this manner will be linked to the current vimtex project,
+and thus the ToC and similar commands will be available, even if the file is
+not a LaTeX file.
+
+                                                       *vimtex-toc-custom-maps*
+Some people may want to have separate mappings for different ToC contents,
+e.g. one mapping to open a table of labels and todos and a different mapping
+to open a table of include files. This may be easily added with custom
+mappings: >
+
+  augroup vimtex_customization
+    autocmd!
+    autocmd FileType tex call CreateTocs()
+  augroup END
+
+  function CreateTocs()
+    let g:custom_toc1 = vimtex#toc#new({
+        \ 'layers' : ['label', 'todo'],
+        \ 'todo_sorted' : 0,
+        \ 'show_help' : 0,
+        \ 'show_numbers' : 0,
+        \ 'mode' : 4,
+        \})
+    nnoremap <silent> \ly :call g:custom_toc1.open()<cr>
+
+    let g:custom_toc2 = vimtex#toc#new({
+        \ 'layers' : ['include'],
+        \ 'show_help' : 0,
+        \})
+    nnoremap <silent> \lY :call g:custom_toc2.open()<cr>
+  endfunction
+
+The `vimtex#toc#new` function takes a dictionary argument that may be used to
+override the one main configuration (i.e. the combination of the default
+values and |g:vimtex_toc_config|).
+
+Associated settings:
+  |g:vimtex_toc_enabled|
+  |g:vimtex_toc_custom_matchers|
+  |g:vimtex_toc_todo_keywords|
+  |g:vimtex_toc_show_preamble|
+  |g:vimtex_toc_config|
+
+------------------------------------------------------------------------------
+Denite/Unite source~
+                                                                *vimtex-denite*
+                                                                 *vimtex-unite*
+
+                                        https://github.com/Shougo/denite.nvim
+                                          https://github.com/Shougo/unite.vim
+|denite.nvim| is is a popular interface for many things, including outlines.
+Although |vimtex| includes a simple interface for a tables of contents, it also
+makes sense to provide these as a source to |denite.nvim|. The source name is
+simply `vimtex`.
+
+|unite.vim| is the predecessor to |denite.nvim|. As for denite, there is a source
+called `vimtex`.
+
+If one prefers the |denite.nvim| or |unite.vim| source to the |vimtex| interface,
+one may override the default mapping, e.g.: >
+
+  nnoremap <localleader>lt :<c-u>Denite vimtex<cr>
+  nnoremap <localleader>lt :<c-u>Unite vimtex<cr>
 
 ==============================================================================
 COMPILER                                                      *vimtex-compiler*
@@ -3002,30 +3395,50 @@ that may be useful for debugging purposes.
 ==============================================================================
 FAQ                                                                *vimtex-faq*
 
+                                                        *vimtex-faq-skimviewer*
+Q: How do I properly set up vimtex with Skim?
+A: First, set |g:vimtex_view_method| to `skim` (see also some relevant info at
+   |vimtex_viewer_skim|). This should already enable forward search. To get
+   backward search, open the settings panel in Skim, then go to the Sync tab
+   and create a custom preset for `PDF-TeX Sync support`. Use the following
+   settings: >
+
+     Command: /Applications/MacVim.app/Contents/bin/mvim
+     Args:    --remote-silent +"%line" "%file"
+<
+   Note: This assumes that you are using MacVim. Ensure that the `Command` path
+         is correct, e.g. by checking with `which mvim` in your shell.
+
+   Note: If you have multiple versions of Vim installed (e.g. default Vim, and
+         one or more versions of MacVim), then make sure that you are
+         consistent in which version of Vim you are running!
+
+   Note: Relevant references:
+         - https://github.com/lervag/vimtex/issues/1140
+         - https://sourceforge.net/p/skim-app/wiki/TeX_and_PDF_Synchronization
+
                                                           *vimtex-faq-surround*
 Q: |vimtex| provides `dse`, `dsc`, `cse`, and `csc`.  These seem to be inspired by
    |surround.vim|.  Does |vimtex| also provide the corresponding `yse` and `ysc`?
 A: The mentioned mappings are indeed inspired by |surround.vim|.  However,
-   |vimtex| does not provide `yse` and `ysc`.  If you use |surround.vim|, then
-   the asked for mappings may be easily added if one adds the following lines
-   to ones `vimrc` file: >
+   |vimtex| does not provide `ys<text-object>e` and `ys<text-object>c`.  If you use
+   |surround.vim|, then the asked for mappings may be easily added if one adds
+   the following lines to `~/.vim/after/ftplugin/tex.vim` or any other
+   `ftplugin/tex.vim` in your |runtimepath|: >
 
-  augroup latexSurround
-     autocmd!
-     autocmd FileType tex call s:latexSurround()
-  augroup END
-
-  function! s:latexSurround()
-     let b:surround_{char2nr("e")}
-       \ = "\\begin{\1environment: \1}\n\t\r\n\\end{\1\1}"
-     let b:surround_{char2nr("c")} = "\\\1command: \1{\r}"
-  endfunction
+  let b:surround_{char2nr('e')}
+      \ = "\\begin{\1environment: \1}\n\t\r\n\\end{\1\1}"
+  let b:surround_{char2nr('c')} = "\\\1command: \1{\r}"
 <
-                                                           *vimtex-faq-isfname*
+   Note: An alternative is to use `vim-sandwich` (see |sandwich.txt| or
+         https://github.com/machakann/vim-sandwich), which has built-in
+         support for LaTeX-specific surroundings.
+
+                                                         *vimtex-faq-isfname*
 Q: Vim throws error when jumping to file with |gf|.
 A: This might be due to the |isfname| setting, which by default contains `{,}`
-   on windows.  |isfname| is a global option, and can therefore not be set by
-   `vimtex`.  Suggested solution is to remove `{,}` from |isfname| by: >
+ on windows.  |isfname| is a global option, and can therefore not be set by
+ `vimtex`.  Suggested solution is to remove `{,}` from |isfname| by: >
 
   set isfname-={,}
 <
@@ -3213,6 +3626,26 @@ CHANGELOG                                                    *vimtex-changelog*
 The following changelog only logs particularly important changes, such as
 changes that break backwards compatibility.  See the git log for the detailed
 changelog.
+
+2018-08-15: Refactored the ToC interface~
+I've made a large update to the code for the ToC window in order to simplify
+and unify the interface. In the new version, |g:vimtex_toc_config| replaces
+all of the following options:
+
+  *g:vimtex_index_split_width*
+  *g:vimtex_index_split_pos*
+  *g:vimtex_index_show_help*
+  *g:vimtex_index_resize*
+  *g:vimtex_index_hide_line_numbers*
+  *g:vimtex_index_mode*
+  *g:vimtex_toc_layers*
+  *g:vimtex_toc_fold*
+  *g:vimtex_toc_fold_level_start*
+  *g:vimtex_toc_hotkeys*
+  *g:vimtex_toc_refresh_always*
+  *g:vimtex_toc_show_numbers*
+  *g:vimtex_toc_tocdepth*
+
 
 2017-07-27: Major refactoring of the folding feature~
 I've made a large update to the code for folding. The configuration of the

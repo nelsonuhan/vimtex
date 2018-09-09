@@ -37,6 +37,11 @@ function! vimtex#doc#make_selection(context) " {{{1
   if has_key(a:context, 'selected') | return | endif
 
   if len(a:context.candidates) == 0
+    if exists('a:context.name')
+      echohl ErrorMsg
+      echo 'Sorry, no doc for '.a:context.name
+      echohl NONE
+    endif
     let a:context.selected = ''
     return
   endif
@@ -90,9 +95,14 @@ endfunction
 " }}}1
 function! s:packages_from_usepackage(cmd) " {{{1
   try
+    " Gather and clean up candidate list
+    let l:candidates = substitute(a:cmd.args[0].text, '%.\{-}\n', '', 'g')
+    let l:candidates = substitute(l:candidates, '\s*', '', 'g')
+    let l:candidates = split(l:candidates, ',')
+
     let l:context = {
           \ 'type': 'usepackage',
-          \ 'candidates': split(a:cmd.args[0].text, ',\s*'),
+          \ 'candidates': l:candidates,
           \}
 
     let l:cword = expand('<cword>')
@@ -228,6 +238,8 @@ function! s:packages_open(context) " {{{1
         \            : '!start /b'))
         \ . ' ' . l:url
         \ . (l:os ==# 'win' ? '' : ' &')
+
+  redraw!
 endfunction
 
 " }}}1

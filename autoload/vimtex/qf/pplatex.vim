@@ -25,8 +25,7 @@ function! s:qf.init(state) abort dict "{{{1
   " Automatically remove the -file-line-error option if we use the latexmk
   " backend (for convenience)
   if a:state.compiler.name ==# 'latexmk'
-    let l:index = index(a:state.compiler.options,
-          \ '-file-line-error')
+    let l:index = index(a:state.compiler.options, '-file-line-error')
     if l:index >= 0
       call remove(a:state.compiler.options, l:index)
     endif
@@ -57,6 +56,9 @@ function! s:qf.init(state) abort dict "{{{1
   setlocal errorformat+=%E**\ Error\ in\ %f:\ %m
   setlocal errorformat+=%W**\ Warning\ in\ %f:\ %m
 
+  " Some errors are difficult even for pplatex
+  setlocal errorformat+=%E**\ Error\ \ :\ 
+
   " Anything that starts with three spaces is part of the message from a
   " previously started multiline error item.
   setlocal errorformat+=%C\ \ \ %m\ on\ input\ line\ %l.
@@ -84,7 +86,7 @@ function! s:qf.setqflist(tex, log, jump) abort dict " {{{1
   silent call system('rm ' . l:tmp)
 
   try
-    call setqflist(getqflist(), 'r', {'title': 'Vimtex errors (' . self.name . ')'})
+    call setqflist([], 'r', {'title': 'Vimtex errors (' . self.name . ')'})
   catch
   endtry
 endfunction

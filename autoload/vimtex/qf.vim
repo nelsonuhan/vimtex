@@ -48,11 +48,15 @@ function! vimtex#qf#open(force) abort " {{{1
     if a:force
       call vimtex#log#warning('No log file found')
     endif
-    cclose
+    if g:vimtex_quickfix_mode > 0
+      cclose
+    endif
     return
   catch
     call vimtex#log#error('Something went wrong when parsing log files!')
-    cclose
+    if g:vimtex_quickfix_mode > 0
+      cclose
+    endif
     return
   endtry
 
@@ -60,7 +64,9 @@ function! vimtex#qf#open(force) abort " {{{1
     if a:force
       call vimtex#log#info('No errors!')
     endif
-    cclose
+    if g:vimtex_quickfix_mode > 0
+      cclose
+    endif
     return
   endif
 
@@ -70,7 +76,8 @@ function! vimtex#qf#open(force) abort " {{{1
   " warnings (forced typically imply that the functions is called from the
   " normal mode mapping).  Else the behaviour is based on the settings.
   "
-  let l:errors_or_warnings = s:qf_has_errors() || g:vimtex_quickfix_open_on_warning
+  let l:errors_or_warnings = s:qf_has_errors()
+        \ || g:vimtex_quickfix_open_on_warning
 
   if a:force || (g:vimtex_quickfix_mode > 0 && l:errors_or_warnings)
     call s:window_save()
@@ -79,8 +86,6 @@ function! vimtex#qf#open(force) abort " {{{1
       call s:window_restore()
     endif
     redraw
-  elseif !l:errors_or_warnings
-    cclose
   endif
 endfunction
 

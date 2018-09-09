@@ -26,7 +26,7 @@ endfunction
 
 " }}}1
 
-function! vimtex#cmd#change() " {{{1
+function! vimtex#cmd#change(...) " {{{1
   let l:cmd = vimtex#cmd#get_current()
   if empty(l:cmd) | return | endif
 
@@ -35,9 +35,13 @@ function! vimtex#cmd#change() " {{{1
   let l:cnum = l:cmd.pos_start.cnum
 
   " Get new command name
-  let l:new_name = vimtex#echo#input({
-        \ 'info' : ['Change command: ', ['VimtexWarning', l:old_name]],
-        \})
+  if a:0 > 0
+    let l:new_name = a:1
+  else
+    let l:new_name = vimtex#echo#input({
+          \ 'info' : ['Change command: ', ['VimtexWarning', l:old_name]],
+          \})
+  endif
   let l:new_name = substitute(l:new_name, '^\\', '', '')
   if empty(l:new_name) | return | endif
 
@@ -58,8 +62,12 @@ function! vimtex#cmd#change() " {{{1
         \ "\<plug>(vimtex-cmd-change)" . l:new_name . '', v:count)
 endfunction
 
-function! vimtex#cmd#delete() " {{{1
-  let l:cmd = vimtex#cmd#get_current()
+function! vimtex#cmd#delete(...) " {{{1
+  if a:0 > 0
+    let l:cmd = call('vimtex#cmd#get_at', a:000)
+  else
+    let l:cmd = vimtex#cmd#get_current()
+  endif
   if empty(l:cmd) | return | endif
 
   " Save current position
@@ -100,6 +108,20 @@ function! vimtex#cmd#delete() " {{{1
 
   " Create repeat hook
   silent! call repeat#set("\<plug>(vimtex-cmd-delete)", v:count)
+endfunction
+
+function! vimtex#cmd#delete_all(...) " {{{1
+  if a:0 > 0
+    let l:cmd = call('vimtex#cmd#get_at', a:000)
+  else
+    let l:cmd = vimtex#cmd#get_current()
+  endif
+  if empty(l:cmd) | return | endif
+
+  call vimtex#pos#set_cursor(l:cmd.pos_start)
+  normal! v
+  call vimtex#pos#set_cursor(l:cmd.pos_end)
+  normal! d
 endfunction
 
 function! vimtex#cmd#create_insert() " {{{1
@@ -316,7 +338,7 @@ function! s:get_cmd_part(part, start_pos) " {{{1
   if empty(l:open)
         \ || l:open.match !=# a:part
         \ || strlen(substitute(
-        \             s:text_between(a:start_pos, l:open), ' ', '', 'g')) != 0
+        \        s:text_between(a:start_pos, l:open), '\_s', '', 'g')) != 0
     return {}
   endif
 
@@ -344,7 +366,7 @@ function! s:text_between(p1, p2, ...) " {{{1
     let lines[-1] = strpart(lines[-1], 0,
           \ l1 == l2 ? c2 - c1 : c2)
   endif
-  return join(lines, '')
+  return join(lines, "\n")
 endfunction
 
 " }}}1

@@ -13,29 +13,53 @@ endfunction
 " }}}1
 
 function! vimtex#matchparen#enable() " {{{1
-  " vint: -ProhibitAutocmdWithNoGroup
-
-  execute 'augroup vimtex_matchparen' . bufnr('%')
-    autocmd!
-    autocmd CursorMoved  <buffer> call s:matchparen.highlight()
-    autocmd CursorMovedI <buffer> call s:matchparen.highlight()
-  augroup END
-
-  call s:matchparen.highlight()
-
-  " vint: +ProhibitAutocmdWithNoGroup
+  call s:matchparen.enable()
 endfunction
 
 " }}}1
 function! vimtex#matchparen#disable() " {{{1
-  call s:matchparen.clear()
-  execute 'autocmd! vimtex_matchparen' . bufnr('%')
+  call s:matchparen.disable()
+endfunction
+
+" }}}1
+function! vimtex#matchparen#popup_check(...) " {{{1
+  if pumvisible()
+    call s:matchparen.highlight()
+  endif
 endfunction
 
 " }}}1
 
 let s:matchparen = {}
 
+function! s:matchparen.enable() abort dict " {{{1
+  " vint: -ProhibitAutocmdWithNoGroup
+
+  execute 'augroup vimtex_matchparen' . bufnr('%')
+    autocmd!
+    autocmd CursorMoved  <buffer> call s:matchparen.highlight()
+    autocmd CursorMovedI <buffer> call s:matchparen.highlight()
+    try
+      autocmd TextChangedP <buffer> call s:matchparen.highlight()
+    catch /E216/
+      silent! let self.timer =
+            \ timer_start(50, 'vimtex#matchparen#popup_check', {'repeat' : -1})
+    endtry
+  augroup END
+
+  call self.highlight()
+
+  " vint: +ProhibitAutocmdWithNoGroup
+endfunction
+
+" }}}1
+function! s:matchparen.disable() abort dict " {{{1
+  call self.clear()
+  execute 'autocmd! vimtex_matchparen' . bufnr('%')
+  silent! call timer_stop(self.timer)
+endfunction
+
+" }}}1
 function! s:matchparen.clear() abort dict " {{{1
   silent! call matchdelete(w:vimtex_match_id1)
   silent! call matchdelete(w:vimtex_match_id2)
@@ -58,10 +82,17 @@ function! s:matchparen.highlight() abort dict " {{{1
         \ ? [l:current, l:corresponding]
         \ : [l:corresponding, l:current]
 
-  let w:vimtex_match_id1 = matchadd('MatchParen',
-        \ '\%' . l:open.lnum . 'l\%' . l:open.cnum . 'c' . l:open.re.this)
-  let w:vimtex_match_id2 = matchadd('MatchParen',
-        \ '\%' . l:close.lnum . 'l\%' . l:close.cnum . 'c' . l:close.re.this)
+  if exists('*matchaddpos')
+    let w:vimtex_match_id1 = matchaddpos('MatchParen',
+          \ [[l:open.lnum, l:open.cnum, strlen(l:open.match)]])
+    let w:vimtex_match_id2 = matchaddpos('MatchParen',
+          \ [[l:close.lnum, l:close.cnum, strlen(l:close.match)]])
+  else
+    let w:vimtex_match_id1 = matchadd('MatchParen',
+          \ '\%' . l:open.lnum . 'l\%' . l:open.cnum . 'c' . l:open.re.this)
+    let w:vimtex_match_id2 = matchadd('MatchParen',
+          \ '\%' . l:close.lnum . 'l\%' . l:close.cnum . 'c' . l:close.re.this)
+  endif
 endfunction
 
 " }}}1

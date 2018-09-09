@@ -13,12 +13,6 @@ function! vimtex#view#mupdf#new() " {{{1
     return {}
   endif
 
-  " Check if the xdotool is available
-  if !executable('xdotool')
-    call vimtex#log#error('MuPDF requires xdotool!')
-    return {}
-  endif
-
   " Use the xwin template
   return vimtex#view#common#apply_xwin_template('MuPDF',
         \ vimtex#view#common#apply_common_template(deepcopy(s:mupdf)))
@@ -143,7 +137,7 @@ function! s:mupdf.compiler_callback(status) dict " {{{1
     endif
   endif
 
-  if g:vimtex_view_use_temp_files || b:vimtex.compiler.callback
+  if g:vimtex_view_use_temp_files || get(b:vimtex.compiler, 'callback')
     call self.xwin_send_keys('r')
   endif
 

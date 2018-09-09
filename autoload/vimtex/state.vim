@@ -221,7 +221,7 @@ function! s:get_main() " {{{1
     if l:id >= 0
       return s:vimtex_states[l:id].tex
     else
-      let s:disabled_modules = ['latexmk', 'view', 'toc', 'labels']
+      let s:disabled_modules = ['latexmk', 'view', 'toc']
       return expand('%:p')
     endif
   endif
@@ -249,8 +249,7 @@ endfunction
 " }}}1
 function! s:get_main_from_texroot() " {{{1
   for l:line in getline(1, 5)
-    let l:filename = matchstr(l:line,
-          \ '^\c\s*%\s*!\?\s*tex\s\+root\s*=\s*\zs.*\ze\s*$')
+    let l:filename = matchstr(l:line, g:vimtex#re#tex_input_root)
     if len(l:filename) > 0
       if l:filename[0] ==# '/'
         if filereadable(l:filename) | return l:filename | endif
@@ -287,6 +286,16 @@ function! s:get_main_from_subfile() " {{{1
           let s:subfile_preserve_root = 1
           return fnamemodify(candidate, ':p')
         endif
+
+        " Check the alternate buffer. This seems sensible e.g. in cases where one
+        " enters an "outer" subfile through a 'gf' motion from the main file.
+        let l:vimtex = getbufvar('#', 'vimtex', {})
+        for l:file in get(l:vimtex, 'sources', [])
+          if expand('%:p') ==# simplify(l:vimtex.root . '/' . l:file)
+            let s:subfile_preserve_root = 1
+            return l:vimtex.tex
+          endif
+        endfor
       endif
     endif
   endfor
@@ -330,16 +339,15 @@ function! s:get_main_recurse(...) " {{{1
     let l:tried[l:file] = [l:file]
   endif
 
+  let l:re_filter = g:vimtex#re#tex_input
+        \ . '\s*\f*' . fnamemodify(l:file, ':t:r')
+
   " Search through candidates found recursively upwards in the directory tree
   for l:cand in s:findfiles_recursive('*.tex', fnamemodify(l:file, ':p:h'))
     if index(l:tried[l:file], l:cand) >= 0 | continue | endif
     call add(l:tried[l:file], l:cand)
 
-    let l:filter_re = g:vimtex#re#tex_input
-          \ . '\s*((.*)\/)?' . fnamemodify(l:file, ':t:r')
-          \ . '%(\.tex)?\}'
-
-    if len(filter(readfile(l:cand), 'v:val =~# l:filter_re')) > 0
+    if len(filter(readfile(l:cand), 'v:val =~# l:re_filter')) > 0
       let l:res = s:get_main_recurse(fnamemodify(l:cand, ':p'), l:tried)
       if !empty(l:res) | return l:res | endif
     endif
@@ -370,7 +378,7 @@ endfunction
 function! s:file_reaches_current(file) " {{{1
   if !filereadable(a:file) | return 0 | endif
 
-  for l:line in readfile(a:file)
+  for l:line in filter(readfile(a:file), 'v:val =~# g:vimtex#re#tex_input')
     let l:file = matchstr(l:line, g:vimtex#re#tex_input . '\zs\f+')
     if empty(l:file) | continue | endif
 
@@ -415,7 +423,7 @@ function! s:vimtex.new(main, preserve_root) abort dict " {{{1
 
   if a:preserve_root && exists('b:vimtex')
     let l:new.root = b:vimtex.root
-    let l:new.base = strpart(a:main, len(b:vimtex.root) + 1)
+    let l:new.base = vimtex#paths#relative(a:main, l:new.root)
   endif
 
   if exists('s:disabled_modules')
@@ -433,15 +441,15 @@ function! s:vimtex.new(main, preserve_root) abort dict " {{{1
         \ 'root' : l:new.root,
         \})
 
-  call l:new.parse_engine()
+  call l:new.parse_tex_program()
   call l:new.parse_documentclass()
+  call l:new.parse_graphicspath()
   call l:new.gather_sources()
 
   call vimtex#view#init_state(l:new)
   call vimtex#compiler#init_state(l:new)
   call vimtex#qf#init_state(l:new)
   call vimtex#toc#init_state(l:new)
-  call vimtex#labels#init_state(l:new)
   call vimtex#fold#init_state(l:new)
 
   " Parsing packages might depend on the compiler setting for build_dir
@@ -477,24 +485,13 @@ function! s:vimtex.cleanup() abort dict " {{{1
 endfunction
 
 " }}}1
-function! s:vimtex.parse_engine() abort dict " {{{1
-  let l:engine_regex =
+function! s:vimtex.parse_tex_program() abort dict " {{{1
+  let l:lines = copy(self.preamble[:20])
+  let l:tex_program_re =
         \ '\v^\c\s*\%\s*\!?\s*tex\s+%(TS-)?program\s*\=\s*\zs.*\ze\s*$'
-  let l:engine_list = {
-        \ 'pdflatex'         : '',
-        \ 'lualatex'         : '-lualatex',
-        \ 'xelatex'          : '-xelatex',
-        \ 'context (pdftex)' : '-pdflatex=texexec',
-        \ 'context (luatex)' : '-pdflatex=context',
-        \ 'context (xetex)'  : '-pdflatex=''texexec --xtx''',
-        \}
-
-  let l:engines = copy(self.preamble[:20])
-  call map(l:engines, 'matchstr(v:val, l:engine_regex)')
-  call filter(l:engines, '!empty(v:val)')
-
-  let self.engine = get(l:engine_list, tolower(get(l:engines, -1, 'pdflatex')),
-        \ get(get(b:, 'vimtex', {}), 'engine', ''))
+  call map(l:lines, 'matchstr(v:val, l:tex_program_re)')
+  call filter(l:lines, '!empty(v:val)')
+  let self.tex_program = tolower(get(l:lines, -1, '_'))
 endfunction
 
 " }}}1
@@ -506,6 +503,28 @@ function! s:vimtex.parse_documentclass() abort dict " {{{1
       let self.documentclass = l:class
       break
     endif
+  endfor
+endfunction
+
+" }}}1
+function! s:vimtex.parse_graphicspath() abort dict " {{{1
+  " Combine the preamble as one long string of commands
+  let l:preamble = join(map(copy(self.preamble),
+        \ 'substitute(v:val, ''\\\@<!%.*'', '''', '''')'))
+
+  " Extract the graphicspath command from this string
+  let l:graphicspath = matchstr(l:preamble,
+          \ g:vimtex#re#not_bslash
+          \ . '\\graphicspath\s*\{\s*\{\s*\zs.{-}\ze\s*\}\s*\}'
+          \)
+
+  " Add all parsed graphicspaths
+  let self.graphicspath = []
+  for l:path in split(l:graphicspath, '\s*}\s*{\s*')
+    let l:path = substitute(l:path, '\/\s*$', '', '')
+    call add(self.graphicspath, l:path[0] ==# '/'
+          \ ? l:path
+          \ : simplify(self.root . '/' . l:path))
   endfor
 endfunction
 
@@ -578,13 +597,17 @@ function! s:vimtex.pprint_items() abort dict " {{{1
         \ ['fls', self.fls()],
         \]
 
-  if !empty(self.engine)
-    call add(l:items, ['engine', self.engine])
+  if self.tex_program !=# '_'
+    call add(l:items, ['tex program', self.tex_program])
   endif
 
   if len(self.sources) >= 2
     call add(l:items, ['source files', self.sources])
   endif
+
+  call add(l:items, ['compiler', get(self, 'compiler', {})])
+  call add(l:items, ['viewer', get(self, 'viewer', {})])
+  call add(l:items, ['qf', get(self, 'qf', {})])
 
   if exists('self.documentclass')
     call add(l:items, ['document class', self.documentclass])
@@ -593,10 +616,6 @@ function! s:vimtex.pprint_items() abort dict " {{{1
   if !empty(self.packages)
     call add(l:items, ['packages', sort(keys(self.packages))])
   endif
-
-  call add(l:items, ['compiler', get(self, 'compiler', {})])
-  call add(l:items, ['viewer', get(self, 'viewer', {})])
-  call add(l:items, ['qf', get(self, 'qf', {})])
 
   return [['vimtex project', l:items]]
 endfunction

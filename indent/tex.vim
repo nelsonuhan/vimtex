@@ -19,7 +19,7 @@ set cpoptions&vim
 setlocal autoindent
 setlocal indentexpr=VimtexIndentExpr()
 setlocal indentkeys&
-setlocal indentkeys+=[,(,{,),},],\&,=item
+setlocal indentkeys+=[,(,{,),},],\&,=item,=else,=fi
 
 function! VimtexIndentExpr() abort " {{{1
   return VimtexIndent(v:lnum)
@@ -60,9 +60,8 @@ function! VimtexIndent(lnum) abort " {{{1
   " Indent environments, delimiters, and tikz
   let l:ind = indent(l:prev_lnum)
   let l:ind += s:indent_envs(l:line, l:prev_line)
-  echom l:ind '-> '
   let l:ind += s:indent_delims(l:line, a:lnum, l:prev_line, l:prev_lnum)
-  echon l:ind
+  let l:ind += s:indent_conditionals(l:line, a:lnum, l:prev_line, l:prev_lnum)
   let l:ind += s:indent_tikz(l:prev_lnum, l:prev_line)
   return l:ind
 endfunction
@@ -157,16 +156,55 @@ function! s:indent_delims(line, lnum, prev_line, prev_lnum) abort " {{{1
         \             - s:count(a:line, s:re_open), 0]))
 endfunction
 
-let s:re_open = join([
-      \ g:vimtex#delim#re.delim_mod_math.open,
-      \ '{',
-      \ '\\\@<!\\\[',
-      \], '\|')
-let s:re_close = join([
-      \ g:vimtex#delim#re.delim_mod_math.close,
-      \ '}',
-      \ '\\\]',
-      \], '\|')
+let s:re_opt = extend({
+      \ 'open' : ['{', '\\\@<!\\\['],
+      \ 'close' : ['}', '\\\]'],
+      \ 'include_modified_math' : 1,
+      \}, get(g:, 'vimtex_indent_delims', {}))
+let s:re_open = join(s:re_opt.open, '\|')
+let s:re_close = join(s:re_opt.close, '\|')
+if s:re_opt.include_modified_math
+  let s:re_open .= (empty(s:re_open) ? '' : '\|') . g:vimtex#delim#re.delim_mod_math.open
+  let s:re_close .= (empty(s:re_close) ? '' : '\|') . g:vimtex#delim#re.delim_mod_math.close
+endif
+
+" }}}1
+function! s:indent_conditionals(line, lnum, prev_line, prev_lnum) abort " {{{1
+  if !exists('s:re_cond')
+    let l:cfg = {}
+
+    if exists('g:vimtex_indent_conditionals')
+      let l:cfg = g:vimtex_indent_conditionals
+      if empty(l:cfg)
+        let s:re_cond = {}
+        return 0
+      endif
+    endif
+
+    let s:re_cond = extend({
+          \ 'open': '\v(\\newif)@<!\\if(field|name|numequal|thenelse)@!',
+          \ 'else': '\\else\>',
+          \ 'close': '\\fi\>',
+          \}, l:cfg)
+  endif
+
+  if empty(s:re_cond) | return 0 | endif
+
+  " Match for conditional indents
+  if a:line =~# s:re_cond.close
+    silent! unlet s:conditional_opened
+    return -s:sw
+  elseif get(s:, 'conditional_opened')
+        \ && a:line =~# s:re_cond.else
+    return -s:sw
+  elseif get(s:, 'conditional_opened')
+        \ && a:prev_line =~# s:re_cond.else
+    return s:sw
+  elseif a:prev_line =~# s:re_cond.open
+    let s:conditional_opened = 1
+    return s:sw
+  endif
+endfunction
 
 " }}}1
 function! s:indent_tikz(lnum, prev) abort " {{{1
@@ -204,6 +242,8 @@ let s:tikz_commands = '\v\\%(' . join([
 " }}}1
 
 function! s:count(line, pattern) abort " {{{1
+  if empty(a:pattern) | return 0 | endif
+
   let l:sum = 0
   let l:indx = match(a:line, a:pattern)
   while l:indx >= 0
