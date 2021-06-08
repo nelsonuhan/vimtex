@@ -1,10 +1,10 @@
-" vimtex - LaTeX plugin for Vim
+" VimTeX - LaTeX plugin for Vim
 "
 " Maintainer: Karl Yngve Lervåg
 " Email:      karl.yngve@gmail.com
 "
 
-function! vimtex#matchparen#init_buffer() " {{{1
+function! vimtex#matchparen#init_buffer() abort " {{{1
   if !g:vimtex_matchparen_enabled | return | endif
 
   call vimtex#matchparen#enable()
@@ -12,17 +12,17 @@ endfunction
 
 " }}}1
 
-function! vimtex#matchparen#enable() " {{{1
+function! vimtex#matchparen#enable() abort " {{{1
   call s:matchparen.enable()
 endfunction
 
 " }}}1
-function! vimtex#matchparen#disable() " {{{1
+function! vimtex#matchparen#disable() abort " {{{1
   call s:matchparen.disable()
 endfunction
 
 " }}}1
-function! vimtex#matchparen#popup_check(...) " {{{1
+function! vimtex#matchparen#popup_check(...) abort " {{{1
   if pumvisible()
     call s:matchparen.highlight()
   endif
@@ -39,6 +39,9 @@ function! s:matchparen.enable() abort dict " {{{1
     autocmd!
     autocmd CursorMoved  <buffer> call s:matchparen.highlight()
     autocmd CursorMovedI <buffer> call s:matchparen.highlight()
+    autocmd BufLeave     <buffer> call s:matchparen.clear()
+    autocmd WinLeave     <buffer> call s:matchparen.clear()
+    autocmd WinEnter     <buffer> call s:matchparen.highlight()
     try
       autocmd TextChangedP <buffer> call s:matchparen.highlight()
     catch /E216/
@@ -69,7 +72,16 @@ endfunction
 function! s:matchparen.highlight() abort dict " {{{1
   call self.clear()
 
-  if vimtex#util#in_comment() | return | endif
+  if vimtex#syntax#in_comment() | return | endif
+
+  " This is a hack to ensure that $ in visual block mode adhers to the rule
+  " specified in :help v_$
+  if mode() ==# "\<c-v>"
+    let l:pos = vimtex#pos#get_cursor()
+    if len(l:pos) == 5 && l:pos[-1] == 2147483647
+      call feedkeys('$', 'in')
+    endif
+  endif
 
   let l:current = vimtex#delim#get_current('all', 'both')
   if empty(l:current) | return | endif
@@ -82,17 +94,10 @@ function! s:matchparen.highlight() abort dict " {{{1
         \ ? [l:current, l:corresponding]
         \ : [l:corresponding, l:current]
 
-  if exists('*matchaddpos')
-    let w:vimtex_match_id1 = matchaddpos('MatchParen',
-          \ [[l:open.lnum, l:open.cnum, strlen(l:open.match)]])
-    let w:vimtex_match_id2 = matchaddpos('MatchParen',
-          \ [[l:close.lnum, l:close.cnum, strlen(l:close.match)]])
-  else
-    let w:vimtex_match_id1 = matchadd('MatchParen',
-          \ '\%' . l:open.lnum . 'l\%' . l:open.cnum . 'c' . l:open.re.this)
-    let w:vimtex_match_id2 = matchadd('MatchParen',
-          \ '\%' . l:close.lnum . 'l\%' . l:close.cnum . 'c' . l:close.re.this)
-  endif
+  let w:vimtex_match_id1 = matchaddpos('MatchParen',
+        \ [[l:open.lnum, l:open.cnum, strlen(l:open.match)]])
+  let w:vimtex_match_id2 = matchaddpos('MatchParen',
+        \ [[l:close.lnum, l:close.cnum, strlen(l:close.match)]])
 endfunction
 
 " }}}1

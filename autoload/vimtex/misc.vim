@@ -1,10 +1,10 @@
-" vimtex - LaTeX plugin for Vim
+" VimTeX - LaTeX plugin for Vim
 "
 " Maintainer: Karl Yngve Lervåg
 " Email:      karl.yngve@gmail.com
 "
 
-function! vimtex#misc#init_buffer() " {{{1
+function! vimtex#misc#init_buffer() abort " {{{1
   command! -buffer                VimtexReload call vimtex#misc#reload()
   command! -buffer -bang -range=% VimtexCountWords
         \ call vimtex#misc#wordcount_display({
@@ -45,7 +45,7 @@ function! vimtex#misc#wordcount(...) abort " {{{1
   if l:range == [1, line('$')]
     let l:file = b:vimtex
   else
-    let l:file = vimtex#parser#selection_to_texfile('arg', l:range)
+    let l:file = vimtex#parser#selection_to_texfile({'range': l:range})
   endif
 
   let cmd  = 'cd ' . vimtex#util#shellescape(l:file.root)
@@ -55,7 +55,7 @@ function! vimtex#misc#wordcount(...) abort " {{{1
   let cmd .= get(l:opts, 'detailed') ? '-inc ' : '-q -1 -merge '
   let cmd .= g:vimtex_texcount_custom_arg . ' '
   let cmd .= vimtex#util#shellescape(l:file.base)
-  let lines = split(system(cmd), '\n')
+  let lines = vimtex#process#capture(cmd)
 
   if l:file.base !=# b:vimtex.base
     call delete(l:file.tex)
@@ -93,7 +93,7 @@ function! vimtex#misc#wordcount_display(opts) abort " {{{1
   0delete _
 
   " Set mappings
-  nnoremap <buffer> <silent> q :bwipeout<cr>
+  nnoremap <silent><buffer><nowait> q :bwipeout<cr>
 
   " Set buffer options
   setlocal bufhidden=wipe
@@ -124,7 +124,19 @@ if get(s:, 'reload_guard', 1)
       execute 'source' l:file
     endfor
 
+    " Temporarily unset b:current_syntax (if active)
+    let l:reload_syntax = get(b:, 'current_syntax', '') ==# 'tex'
+    if l:reload_syntax
+      unlet b:current_syntax
+    endif
+
     call vimtex#init()
+
+    " Reload syntax
+    if l:reload_syntax
+      syntax clear
+      runtime! syntax/tex.vim
+    endif
 
     " Reload indent file
     if exists('b:did_vimtex_indent')

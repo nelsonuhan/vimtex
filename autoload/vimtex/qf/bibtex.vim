@@ -1,4 +1,4 @@
-" vimtex - LaTeX plugin for Vim
+" VimTeX - LaTeX plugin for Vim
 "
 " Maintainer: Karl Yngve Lervåg
 " Email:      karl.yngve@gmail.com
@@ -8,36 +8,21 @@ function! vimtex#qf#bibtex#addqflist(blg) abort " {{{1
   if get(g:vimtex_quickfix_blgparser, 'disable') | return | endif
 
   try
-    call s:bibtex.prepare(a:blg)
-    call s:bibtex.addqflist()
-    call s:bibtex.restore()
+    call s:qf.addqflist(a:blg)
   catch /BibTeX Aborted/
   endtry
 endfunction
 
 " }}}1
 
-let s:bibtex = {
+
+let s:qf = {
       \ 'file' : '',
       \ 'types' : [],
       \ 'db_files' : [],
       \}
-function! s:bibtex.prepare(blg) abort " {{{1
-  let self.file = a:blg
-  if empty(self.file) || !filereadable(self.file) | throw 'BibTeX Aborted' | endif
 
-  let self.types = map(
-        \ filter(items(s:), 'v:val[0] =~# ''^type_'''),
-        \ 'v:val[1]')
-  let self.db_files = []
-
-  augroup vimtex_qf_tmp
-    autocmd!
-    autocmd QuickFixCmdPost [cl]*file call s:bibtex.fix_paths()
-  augroup END
-
-  let self.errorformat_saved = &l:errorformat
-
+function! s:qf.set_errorformat() abort dict "{{{1
   setlocal errorformat=%+E%.%#---line\ %l\ of\ file\ %f
   setlocal errorformat+=%+EI\ found\ %.%#---while\ reading\ file\ %f
   setlocal errorformat+=%+WWarning--empty\ %.%#\ in\ %.%m
@@ -47,20 +32,28 @@ function! s:bibtex.prepare(blg) abort " {{{1
 endfunction
 
 " }}}1
-function! s:bibtex.addqflist() abort " {{{1
-  execute 'caddfile' fnameescape(self.file)
+function! s:qf.addqflist(blg) abort " {{{1
+  let self.file = a:blg
+  if empty(self.file) || !filereadable(self.file) | throw 'BibTeX Aborted' | endif
+
+  let self.types = map(
+        \ filter(items(s:), 'v:val[0] =~# ''^type_'''),
+        \ 'v:val[1]')
+  let self.db_files = []
+
+  call vimtex#qf#u#caddfile(self, fnameescape(self.file))
+
+  call self.fix_paths()
 endfunction
 
 " }}}1
-function! s:bibtex.restore() abort " {{{1
-  let &l:errorformat = self.errorformat_saved
-  autocmd! vimtex_qf_tmp
-endfunction
-
-" }}}1
-function! s:bibtex.fix_paths() abort " {{{1
+function! s:qf.fix_paths() abort " {{{1
   let l:qflist = getqflist()
-  let l:title = getqflist({'title': 1})
+  try
+    let l:title = getqflist({'title': 1})
+  catch /E118/
+    let l:title = 'VimTeX errors'
+  endtry
 
   for l:qf in l:qflist
     for l:type in self.types
@@ -78,7 +71,7 @@ function! s:bibtex.fix_paths() abort " {{{1
 endfunction
 
 " }}}1
-function! s:bibtex.get_db_files() abort " {{{1
+function! s:qf.get_db_files() abort " {{{1
   if empty(self.db_files)
     let l:build_dir = fnamemodify(b:vimtex.ext('log'), ':.:h') . '/'
     for l:file in map(
@@ -96,7 +89,7 @@ function! s:bibtex.get_db_files() abort " {{{1
 endfunction
 
 " }}}1
-function! s:bibtex.get_key_loc(key) abort " {{{1
+function! s:qf.get_key_loc(key) abort " {{{1
   for l:file in self.get_db_files()
     let l:lines = readfile(l:file)
     let l:lnum = 0
@@ -128,7 +121,7 @@ endfunction
 " }}}1
 
 let s:type_empty = {
-      \ 're' : '\vWarning--empty (.*) in (\S*)',
+      \ 're' : '\vWarning--empty (.*) in ([^ ;]*)(.*)',
       \}
 function! s:type_empty.fix(ctx, entry) abort " {{{1
   let l:matches = matchlist(a:entry.text, self.re)
@@ -136,9 +129,12 @@ function! s:type_empty.fix(ctx, entry) abort " {{{1
 
   let l:type = l:matches[1]
   let l:key = l:matches[2]
+  let l:more = matchstr(l:matches[3], '; \zs.*')
 
   unlet a:entry.bufnr
-  let a:entry.text = printf('Missing "%s" in "%s"', l:type, l:key)
+  let a:entry.text = empty(l:more)
+        \ ? printf('Missing "%s" in "%s"', l:type, l:key)
+        \ : printf('Missing "%s" in "%s" (%s)', l:type, l:key, l:more)
 
   let l:loc = a:ctx.get_key_loc(l:key)
   if !empty(l:loc)

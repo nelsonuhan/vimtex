@@ -1,30 +1,29 @@
-" vimtex - LaTeX plugin for Vim
+" VimTeX - LaTeX plugin for Vim
 "
 " Maintainer: Karl Yngve Lervåg
 " Email:      karl.yngve@gmail.com
 "
 
-function! vimtex#view#mupdf#new() " {{{1
+function! vimtex#view#mupdf#new() abort " {{{1
   " Check if the viewer is executable
   if !executable('mupdf')
     call vimtex#log#error(
           \ 'MuPDF is not executable!',
-          \ '- vimtex viewer will not work!')
+          \ '- VimTeX viewer will not work!')
     return {}
   endif
 
-  " Use the xwin template
-  return vimtex#view#common#apply_xwin_template('MuPDF',
-        \ vimtex#view#common#apply_common_template(deepcopy(s:mupdf)))
+  return vimtex#view#_template_xwin#apply(deepcopy(s:mupdf))
 endfunction
 
 " }}}1
+
 
 let s:mupdf = {
       \ 'name': 'MuPDF',
       \}
 
-function! s:mupdf.start(outfile) dict " {{{1
+function! s:mupdf.start(outfile) dict abort " {{{1
   let l:cmd = 'mupdf ' .  g:vimtex_view_mupdf_options
         \ . ' ' . vimtex#util#shellescape(a:outfile)
   let self.process = vimtex#process#start(l:cmd)
@@ -38,7 +37,7 @@ function! s:mupdf.start(outfile) dict " {{{1
 endfunction
 
 " }}}1
-function! s:mupdf.forward_search(outfile) dict " {{{1
+function! s:mupdf.forward_search(outfile) dict abort " {{{1
   if !executable('xdotool') | return | endif
   if !executable('synctex') | return | endif
 
@@ -62,12 +61,27 @@ function! s:mupdf.forward_search(outfile) dict " {{{1
 endfunction
 
 " }}}1
-function! s:mupdf.reverse_search() dict " {{{1
+function! s:mupdf.latexmk_append_argument() dict abort " {{{1
+  if g:vimtex_view_use_temp_files
+    let cmd = ' -view=none'
+  else
+    let cmd  = vimtex#compiler#latexmk#wrap_option('new_viewer_always', '0')
+    let cmd .= vimtex#compiler#latexmk#wrap_option('pdf_update_method', '2')
+    let cmd .= vimtex#compiler#latexmk#wrap_option('pdf_update_signal', 'SIGHUP')
+    let cmd .= vimtex#compiler#latexmk#wrap_option('pdf_previewer',
+          \ 'mupdf ' .  g:vimtex_view_mupdf_options)
+  endif
+
+  return cmd
+endfunction
+
+" }}}1
+function! s:mupdf.reverse_search() dict abort " {{{1
   if !executable('xdotool') | return | endif
   if !executable('synctex') | return | endif
 
   let outfile = self.out()
-  if vimtex#view#common#not_readable(outfile) | return | endif
+  if vimtex#view#not_readable(outfile) | return | endif
 
   if !self.xwin_exists()
     call vimtex#log#warning('Reverse search failed (is MuPDF open?)')
@@ -106,77 +120,8 @@ function! s:mupdf.reverse_search() dict " {{{1
 endfunction
 
 " }}}1
-function! s:mupdf.compiler_callback(status) dict " {{{1
-  if !a:status && g:vimtex_view_use_temp_files < 2
-    return
-  endif
-
-  if g:vimtex_view_use_temp_files
-    call self.copy_files()
-  endif
-
-  if !filereadable(self.out()) | return | endif
-
-  if g:vimtex_view_automatic
-    "
-    " Search for existing window created by latexmk
-    "   It may be necessary to wait some time before it is opened and
-    "   recognized. Sometimes it is very quick, other times it may take
-    "   a second. This way, we don't block longer than necessary.
-    "
-    if !has_key(self, 'started_through_callback')
-      for l:dummy in range(30)
-        sleep 50m
-        if self.xwin_exists() | break | endif
-      endfor
-    endif
-
-    if !self.xwin_exists() && !has_key(self, 'started_through_callback')
-      call self.start(self.out())
-      let self.started_through_callback = 1
-    endif
-  endif
-
-  if g:vimtex_view_use_temp_files || get(b:vimtex.compiler, 'callback')
-    call self.xwin_send_keys('r')
-  endif
-
-  if has_key(self, 'hook_callback')
-    call self.hook_callback()
-  endif
-endfunction
-
-" }}}1
-function! s:mupdf.latexmk_append_argument() dict " {{{1
-  if g:vimtex_view_use_temp_files
-    let cmd = ' -view=none'
-  else
-    let cmd  = vimtex#compiler#latexmk#wrap_option('new_viewer_always', '0')
-    let cmd .= vimtex#compiler#latexmk#wrap_option('pdf_update_method', '2')
-    let cmd .= vimtex#compiler#latexmk#wrap_option('pdf_update_signal', 'SIGHUP')
-    let cmd .= vimtex#compiler#latexmk#wrap_option('pdf_previewer',
-          \ 'mupdf ' .  g:vimtex_view_mupdf_options)
-  endif
-
-  return cmd
-endfunction
-
-" }}}1
-function! s:mupdf.focus_viewer() dict " {{{1
-  if !executable('xdotool') | return | endif
-
-  if self.xwin_id > 0
-    silent call system('xdotool windowactivate ' . self.xwin_id . ' --sync')
-    silent call system('xdotool windowraise ' . self.xwin_id)
-  endif
-endfunction
-
-" }}}1
-function! s:mupdf.focus_vim() dict " {{{1
-  if !executable('xdotool') | return | endif
-
-  silent call system('xdotool windowactivate ' . v:windowid . ' --sync')
-  silent call system('xdotool windowraise ' . v:windowid)
+function! s:mupdf.compiler_callback() dict abort " {{{1
+  call self.xwin_send_keys('r')
 endfunction
 
 " }}}1

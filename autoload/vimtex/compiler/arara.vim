@@ -1,4 +1,4 @@
-" vimtex - LaTeX plugin for Vim
+" VimTeX - LaTeX plugin for Vim
 "
 " Maintainer: Karl Yngve Lervåg
 " Email:      karl.yngve@gmail.com
@@ -17,12 +17,9 @@ endfunction
 
 let s:compiler = {
       \ 'name' : 'arara',
-      \ 'backend' : has('nvim') ? 'nvim'
-      \                         : v:version >= 800 ? 'jobs' : 'process',
       \ 'root' : '',
       \ 'target' : '',
       \ 'target_path' : '',
-      \ 'background' : 1,
       \ 'output' : tempname(),
       \ 'options' : ['--log'],
       \}
@@ -32,15 +29,11 @@ function! s:compiler.init(options) abort dict " {{{1
 
   if !executable('arara')
     call vimtex#log#warning('arara is not executable!')
-    throw 'vimtex: Requirements not met'
+    throw 'VimTeX: Requirements not met'
   endif
 
-  call extend(self, deepcopy(s:compiler_{self.backend}))
-
-  " Processes run with the new jobs api will not run in the foreground
-  if self.backend !=# 'process'
-    let self.background = 1
-  endif
+  let l:backend = has('nvim') ? 'nvim' : 'jobs'
+  call extend(self, deepcopy(s:compiler_{l:backend}))
 endfunction
 
 " }}}1
@@ -64,17 +57,10 @@ endfunction
 function! s:compiler.pprint_items() abort dict " {{{1
   let l:configuration = []
 
-  if self.backend ==# 'process'
-    call add(l:configuration, ['background', self.background])
-  endif
-
   call add(l:configuration, ['arara options', self.options])
 
   let l:list = []
-  call add(l:list, ['backend', self.backend])
-  if self.background
-    call add(l:list, ['output', self.output])
-  endif
+  call add(l:list, ['output', self.output])
 
   if self.target_path !=# b:vimtex.tex
     call add(l:list, ['root', self.root])
@@ -104,11 +90,7 @@ endfunction
 function! s:compiler.start(...) abort dict " {{{1
   call self.exec()
 
-  if self.background
-    call vimtex#log#info('Compiler started in background')
-  else
-    call vimtex#compiler#callback(!vimtex#qf#inquire(self.target))
-  endif
+  call vimtex#log#info('Compiler started in background')
 endfunction
 
 " }}}1
@@ -118,35 +100,21 @@ endfunction
 
 " }}}1
 function! s:compiler.stop() abort dict " {{{1
-  " Pass
+  if self.is_running()
+    call self.kill()
+  endif
 endfunction
 
 " }}}1
-function! s:compiler.is_running() abort dict " {{{1
-  return 0
-endfunction
+function! s:compiler.wait() abort dict " {{{1
+  for l:dummy in range(50)
+    sleep 100m
+    if !self.is_running()
+      return
+    endif
+  endfor
 
-" }}}1
-function! s:compiler.kill() abort dict " {{{1
-  " Pass
-endfunction
-
-" }}}1
-function! s:compiler.get_pid() abort dict " {{{1
-  return 0
-endfunction
-
-" }}}1
-
-let s:compiler_process = {}
-function! s:compiler_process.exec() abort dict " {{{1
-  let self.process = vimtex#process#new()
-  let self.process.name = 'arara'
-  let self.process.background = self.background
-  let self.process.workdir = self.root
-  let self.process.output = self.output
-  let self.process.cmd = self.build_cmd()
-  call self.process.run()
+  call self.stop()
 endfunction
 
 " }}}1
@@ -167,14 +135,25 @@ function! s:compiler_jobs.exec() abort dict " {{{1
   let s:cb_target = self.target_path !=# b:vimtex.tex ? self.target_path : ''
   let l:options.exit_cb = function('s:callback')
 
-  if !empty(self.root)
-    let l:save_pwd = getcwd()
-    execute 'lcd' fnameescape(self.root)
-  endif
+  call vimtex#paths#pushd(self.root)
   let self.job = job_start(l:cmd, l:options)
-  if !empty(self.root)
-    execute 'lcd' fnameescape(l:save_pwd)
-  endif
+  call vimtex#paths#popd()
+endfunction
+
+" }}}1
+function! s:compiler_jobs.kill() abort dict " {{{1
+  call job_stop(self.job)
+endfunction
+
+" }}}1
+function! s:compiler_jobs.is_running() abort dict " {{{1
+  return has_key(self, 'job') && job_status(self.job) ==# 'run'
+endfunction
+
+" }}}1
+function! s:compiler_jobs.get_pid() abort dict " {{{1
+  return has_key(self, 'job')
+        \ ? get(job_info(self.job), 'process') : 0
 endfunction
 
 " }}}1
@@ -204,6 +183,30 @@ function! s:compiler_nvim.exec() abort dict " {{{1
 endfunction
 
 " }}}1
+function! s:compiler_nvim.kill() abort dict " {{{1
+  call jobstop(self.job)
+endfunction
+
+" }}}1
+function! s:compiler_nvim.is_running() abort dict " {{{1
+  try
+    let pid = jobpid(self.job)
+    return 1
+  catch
+    return 0
+  endtry
+endfunction
+
+" }}}1
+function! s:compiler_nvim.get_pid() abort dict " {{{1
+  try
+    return jobpid(self.job)
+  catch
+    return 0
+  endtry
+endfunction
+
+" }}}1
 function! s:callback_nvim_output(id, data, event) abort dict " {{{1
   if !empty(a:data)
     call writefile(filter(a:data, '!empty(v:val)'), self.output, 'a')
@@ -212,6 +215,8 @@ endfunction
 
 " }}}1
 function! s:callback_nvim_exit(id, data, event) abort dict " {{{1
+  if !exists('b:vimtex.tex') | return | endif
+
   let l:target = self.target !=# b:vimtex.tex ? self.target : ''
   call vimtex#compiler#callback(!vimtex#qf#inquire(l:target))
 endfunction
